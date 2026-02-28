@@ -1,0 +1,79 @@
+### v0 PROMPT 1 — Design System + Onboarding
+```
+Build the onboarding flow for a mobile PWA called Loop Pulse.
+This is a React/Next.js component using Tailwind CSS and
+shadcn/ui. Mobile-first, 375px max-width, centered.
+
+DESIGN SYSTEM (apply to everything):
+- Background: #F7F6F3
+- Surface/cards: #FFFFFF
+- Border: #E8E5DF
+- Text primary: #1C1B18
+- Text secondary: #7C7870
+- Text tertiary: #B5B0A7
+- Accent: #E8533A (coral — use sparingly)
+- Success: #16A34A with bg #EDF7F2
+- Warning: #B8860B with bg #FDF8ED
+- Danger: #C8303A with bg #FDF0F1
+- Font: DM Sans for body, DM Mono for labels/timestamps
+- Card radius: 16px, small elements: 10px, pills: 20px
+- Card shadow: 0 1px 3px rgba(28,27,24,0.06), 0 4px 16px rgba(28,27,24,0.04)
+- All cards: scale(0.97) on active/tap, lift on hover
+- Animations: fade-up 0.4s with staggered children
+
+ONBOARDING — 2 steps, one screen per step:
+
+STEP 1 — Single page with all fields:
+- Top: Loop Pulse logo icon (coral star/spark icon) 
+- Large heading: "Welcome to Loop." 
+- Subtitle: "Feel the pulse of your city. Let's get you set up."
+- Field 1: "What should we call you?" — text input, 
+  placeholder "First name", optional
+- Field 2: "I am a..." — MULTI-SELECT pill buttons 
+  (max 2 selections, coral border + bg when selected):
+  Student / Commuter / Local Resident / Visitor
+  Small helper: "Select up to 2"
+- Field 3: "What are you into?" — multi-select pill 
+  buttons (max 3):
+  Food & Drinks / Events & Shows / Safety & Navigation /
+  Sports / Local Gems / Nightlife
+- Large primary CTA button: "Continue →" 
+  Full width, #1C1B18 background, disabled until name 
+  entered OR persona selected. Turns coral when ready.
+- Saves to localStorage key "loop_pulse_profile"
+
+STEP 2 — University + Zone:
+- Heading: "One more thing."
+- Subtitle: "Helps us personalize your Loop experience."
+- Section: "Are you a student?" — 5 choice cards:
+  DePaul University (show subtle #005596 blue left border)
+  Illinois Institute of Technology
+  Columbia College Chicago
+  Roosevelt University
+  Not a student → skip
+  Single select. DePaul card has small blue demon emoji.
+- Section: "Your home base in the Loop" — 5 zone cards:
+  📍 North Loop — "Millennium Park, Michigan Ave"
+  🎓 DePaul Loop — "Jackson, State, Congress"
+  🏢 West Loop — "Wacker, Willis Tower"
+  🌆 South Loop — "Roosevelt, Museum Campus"
+  📡 Use my GPS — pulsing dot animation
+  Single select.
+- CTA: "Enter the Loop →" full width coral button
+- On complete: save full profile to localStorage, 
+  navigate to /home
+
+Profile shape saved to localStorage:
+{
+  name: string,
+  personas: string[],
+  university: string,
+  interests: string[],
+  homeZone: string,
+  currentZone: string,
+  onboardedAt: string
+}
+
+Check on app load: if profile exists and onboardedAt 
+is set, skip onboarding and go straight to home.
+```
