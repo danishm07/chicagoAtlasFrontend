@@ -1,3 +1,5 @@
+import { Platform } from "react-native";
+
 const Colors = {
   background: "#F7F6F3",
   surface: "#FFFFFF",
@@ -13,13 +15,18 @@ const Colors = {
   danger: "#C8303A",
   dangerBg: "#FDF0F1",
   depaul: "#005596",
-  cardShadow: {
-    shadowColor: "#1C1B18",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
-    elevation: 2,
-  },
+  cardShadow: Platform.select({
+    web: {
+      boxShadow: "0 1px 3px rgba(28,27,24,0.06), 0 4px 16px rgba(28,27,24,0.04)",
+    },
+    default: {
+      shadowColor: "#1C1B18",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.06,
+      shadowRadius: 3,
+      elevation: 2,
+    },
+  }) as object,
 } as const;
 
 export default Colors;

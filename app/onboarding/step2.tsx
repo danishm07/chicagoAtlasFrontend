@@ -78,12 +78,7 @@ function PulsingDot() {
 
   return (
     <View style={styles.pulseContainer}>
-      <Animated.View
-        style={[
-          styles.pulseRing,
-          { transform: [{ scale }], opacity },
-        ]}
-      />
+      <Animated.View style={[styles.pulseRing, { transform: [{ scale }], opacity }]} />
       <View style={styles.pulseDot} />
     </View>
   );
@@ -152,9 +147,7 @@ function SelectCard({
               </View>
             )}
           </View>
-          {sub ? (
-            <Text style={styles.cardSub}>{sub}</Text>
-          ) : null}
+          {sub ? <Text style={styles.cardSub}>{sub}</Text> : null}
         </View>
 
         <View style={[styles.radioOuter, selected && styles.radioOuterSelected]}>
@@ -324,7 +317,7 @@ const styles = StyleSheet.create({
     width: 40,
   },
   heading: {
-    fontFamily: "DM_Sans_700Bold",
+    fontFamily: "DMSans_700Bold",
     fontSize: 34,
     color: Colors.textPrimary,
     letterSpacing: -0.8,
@@ -332,7 +325,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   subtitle: {
-    fontFamily: "DM_Sans_400Regular",
+    fontFamily: "DMSans_400Regular",
     fontSize: 16,
     color: Colors.textSecondary,
     lineHeight: 24,
@@ -342,7 +335,7 @@ const styles = StyleSheet.create({
     marginBottom: 36,
   },
   sectionTitle: {
-    fontFamily: "DM_Sans_600SemiBold",
+    fontFamily: "DMSans_600SemiBold",
     fontSize: 15,
     color: Colors.textPrimary,
     marginBottom: 12,
@@ -360,7 +353,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 13,
     gap: 12,
-    ...Colors.cardShadow,
   },
   cardSelected: {
     borderColor: Colors.accent,
@@ -386,16 +378,16 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   cardLabel: {
-    fontFamily: "DM_Sans_500Medium",
+    fontFamily: "DMSans_500Medium",
     fontSize: 15,
     color: Colors.textPrimary,
   },
   cardLabelSelected: {
     color: Colors.accent,
-    fontFamily: "DM_Sans_600SemiBold",
+    fontFamily: "DMSans_600SemiBold",
   },
   cardSub: {
-    fontFamily: "DM_Mono_400Regular",
+    fontFamily: "DMMono_400Regular",
     fontSize: 11,
     color: Colors.textTertiary,
     marginTop: 2,
@@ -472,7 +464,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accent,
   },
   ctaText: {
-    fontFamily: "DM_Sans_600SemiBold",
+    fontFamily: "DMSans_600SemiBold",
     fontSize: 16,
     color: Colors.textTertiary,
   },

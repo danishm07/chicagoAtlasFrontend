@@ -1,0 +1,145 @@
+### v0 PROMPT 2 — Home Screen
+```
+Build the Home screen for a mobile PWA called Loop Pulse.
+React/Next.js, Tailwind, shadcn/ui. 375px max-width.
+
+DESIGN SYSTEM:
+- Background: #F7F6F3
+- Surface/cards: #FFFFFF  
+- Border: #E8E5DF
+- Text primary: #1C1B18
+- Text secondary: #7C7870
+- Text tertiary: #B5B0A7
+- Accent: #E8533A
+- Success green: #16A34A, bg #EDF7F2
+- Warning amber: #B8860B, bg #FDF8ED  
+- Danger red: #C8303A, bg #FDF0F1
+- DePaul blue: #005596
+- Font: DM Sans body, DM Mono for labels/numbers/tags
+- Cards: 16px radius, subtle shadow, scale(0.97) on tap
+- Staggered fade-up animations on load
+
+BOTTOM NAV (shared across all screens):
+3 tabs: Pulse (activity icon) / Feed (grid icon) / 
+Chat (message icon). Height 72px, #F7F6F3 bg, 
+blur backdrop, top border #E8E5DF.
+Active tab: icon + label turn #E8533A, icon scales 1.1.
+Inactive: #B5B0A7.
+
+HOME SCREEN LAYOUT (top to bottom):
+
+1. HEADER ROW (20px padding, 20px top):
+Left side:
+- Small text: "Good evening," (secondary color)  
+- Large text: "Danish" (use profile name, 24px bold)
+- Location chip below name: tappable pill showing 
+  "📍 DePaul Loop" with chevron → opens zone picker
+
+Right side:
+- Bookmark icon button (opens saved panel)
+- Gear icon button (opens settings panel)
+- Green LIVE pill: pulsing dot + "LIVE" in DM Mono
+
+2. PULSE HERO CARD (20px margin, dark card):
+- Background: #1C1B18, radius 24px
+- Subtle radial glow top-right: rgba(232,83,58,0.12)
+- DM Mono label top: "// LOOP HEALTH SCORE" dimmed white
+- Circular progress ring around score (coral color, 
+  animated fill on load, 120px diameter)
+- Score number: 87, large (56px), white, bold
+- Below ring: status label "Moderately Busy" 
+  with coral dot indicator
+- Two stat cards side by side inside hero:
+  Left: trend arrow icon + "Past 30 Min ↑ Trending Up"
+  Right: people icon + "Density: Moderate"
+  Both: slightly lighter dark background, 10px radius
+- Both stat cards ARE TAPPABLE → show onClick handler
+  with TODO comment for bottom sheet
+- Footer: "Updated 2 min ago" + refresh button
+
+3. DATA CARDS (2x2 grid, 10px gap, 20px padding):
+4 white cards, each tappable (onClick with TODO comment):
+
+Card 1 — Safety:
+  Icon: 🛡️ in green circle
+  Value: "2" large bold
+  Label: "Nearby Incidents"  
+  Pill: green "✓ Low Risk"
+
+Card 2 — Events:
+  Icon: 🎟️ in blue circle
+  Value: "4" large bold
+  Label: "Today's Events"
+  Pill: blue "→ View All"
+
+Card 3 — Spots:
+  Icon: 🍽️ in coral circle
+  Value: "38" large bold
+  Label: "Open Nearby"
+  Pill: green "✓ Active"
+
+Card 4 — Air Quality:
+  Icon: 🌿 in green circle
+  Value: "52" large bold  
+  Label: "AQI — Good"
+  Pill: green "✓ Safe"
+
+ALL cards have skeleton loading state (animated shimmer).
+ALL cards are tappable. ALL have empty state:
+value "—", pill "Checking...", 
+tiny text "The Loop is never quiet — check back soon"
+
+4. GAME DAY CARD (conditional, full width, 20px margin):
+Only show when hasGame=true (use true for mock).
+Background: #005596 (DePaul blue), radius 16px.
+Left: 🏀 emoji, "DePaul vs Marquette", "Tonight 7:00 PM",
+"Wintrust Arena · 0.8 mi"
+Right: white pill "From $18", small "Get Tickets →" link
+Bottom row: "⚠️ Wabash Ave busy post-game"
+Entire card tappable → onClick TODO comment.
+
+5. TRENDING NOW section:
+Section header: "Trending Now" left, 
+"View All →" right in coral (tappable).
+Horizontal scroll strip, no scrollbar, 20px left padding:
+Each chip: white card, 150px min-width, 16px radius, shadow
+  - DM Mono category tag (9px, uppercase, tertiary)
+  - Name (13px, bold)
+  - Meta line with arrow
+Items: 
+  "BUSY / Millennium Park / ↑ 3× normal traffic"
+  "TONIGHT / Symphony Center / Doors 6:30PM · ~2,500"  
+  "TRENDING / Gyu-Kaku Loop / Mentioned 47× today"
+  "SPORTS / DePaul vs Marquette / Tonight · Wintrust"
+Each chip tappable → onClick TODO comment.
+
+6. ACTIVE ALERTS section:
+Section header: "Active Alerts"
+White container card with inner list items:
+Each alert: colored dot (orange=medium, green=low, red=high)
++ alert text + "Just now" timestamp + info icon button.
+Items:
+  🟠 "Traffic blocked on State St" — Just now
+  🟢 "Noise complaint near DePaul" — Just now  
+  🔴 "Fire alarm on Wabash" — Just now
+Each row tappable → onClick TODO comment.
+
+7. CHAT PREVIEW CARD (full width, 20px margin):
+White card, coral left border 3px.
+Left: dark square with ◈ symbol (coral).
+Center: italic "What should I do near DePaul tonight?"
+in secondary color. Below: "Tap to ask the Loop →" 
+in tertiary, 11px.
+Right: coral → arrow.
+Tapping navigates to Chat tab.
+
+IN-APP ALERT BANNER:
+Slides down from top when triggered. Coral background,
+white text. Left: ⚠️ + message. Right: × dismiss.
+Auto-dismisses 8 seconds. One at a time.
+Show mock banner on load for demo: 
+"DePaul vs Marquette starts in 60 min →"
+
+All data as mock/hardcoded. Add TODO comments everywhere
+real data would be fetched.
+```

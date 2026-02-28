@@ -1,10 +1,5 @@
 import React from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  Platform,
-} from "react-native";
+import { View, Text, StyleSheet, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
@@ -14,6 +9,13 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { profile } = useProfile();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
+
+  const zoneName = profile?.homeZone
+    ? profile.homeZone
+        .split("_")
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(" ")
+    : "The Loop";
 
   return (
     <View style={[styles.root, { paddingTop: topPad }]}>
@@ -26,11 +28,7 @@ export default function HomeScreen() {
         </View>
         <View style={styles.zonePill}>
           <Feather name="map-pin" size={11} color={Colors.accent} />
-          <Text style={styles.zoneText}>
-            {profile?.homeZone
-              ? profile.homeZone.replace("_", " ").replace(/\b\w/g, (l) => l.toUpperCase())
-              : "The Loop"}
-          </Text>
+          <Text style={styles.zoneText}>{zoneName}</Text>
         </View>
       </View>
 
@@ -76,7 +74,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   logoText: {
-    fontFamily: "DM_Sans_700Bold",
+    fontFamily: "DMSans_700Bold",
     fontSize: 15,
     color: Colors.textPrimary,
     letterSpacing: -0.3,
@@ -91,7 +89,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   zoneText: {
-    fontFamily: "DM_Mono_400Regular",
+    fontFamily: "DMMono_400Regular",
     fontSize: 11,
     color: Colors.accent,
     letterSpacing: 0.3,
@@ -113,20 +111,20 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   greeting: {
-    fontFamily: "DM_Sans_700Bold",
+    fontFamily: "DMSans_700Bold",
     fontSize: 28,
     color: Colors.textPrimary,
     letterSpacing: -0.5,
     textAlign: "center",
   },
   sub: {
-    fontFamily: "DM_Sans_400Regular",
+    fontFamily: "DMSans_400Regular",
     fontSize: 16,
     color: Colors.textSecondary,
     textAlign: "center",
   },
   meta: {
-    fontFamily: "DM_Mono_400Regular",
+    fontFamily: "DMMono_400Regular",
     fontSize: 12,
     color: Colors.textTertiary,
     textAlign: "center",

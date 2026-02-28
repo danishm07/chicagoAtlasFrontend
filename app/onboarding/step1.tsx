@@ -205,12 +205,7 @@ export default function OnboardingStep1() {
       </ScrollView>
 
       {/* CTA */}
-      <View
-        style={[
-          styles.ctaWrapper,
-          { paddingBottom: bottomPad + 16 },
-        ]}
-      >
+      <View style={[styles.ctaWrapper, { paddingBottom: bottomPad + 16 }]}>
         <Pressable onPress={handleContinue} disabled={!isReady}>
           <Animated.View
             style={[
@@ -261,13 +256,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   logoText: {
-    fontFamily: "DM_Sans_700Bold",
+    fontFamily: "DMSans_700Bold",
     fontSize: 16,
     color: Colors.textPrimary,
     letterSpacing: -0.3,
   },
   heading: {
-    fontFamily: "DM_Sans_700Bold",
+    fontFamily: "DMSans_700Bold",
     fontSize: 34,
     color: Colors.textPrimary,
     letterSpacing: -0.8,
@@ -275,7 +270,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   subtitle: {
-    fontFamily: "DM_Sans_400Regular",
+    fontFamily: "DMSans_400Regular",
     fontSize: 16,
     color: Colors.textSecondary,
     lineHeight: 24,
@@ -291,13 +286,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   fieldLabel: {
-    fontFamily: "DM_Sans_600SemiBold",
+    fontFamily: "DMSans_600SemiBold",
     fontSize: 15,
     color: Colors.textPrimary,
     marginBottom: 12,
   },
   helperText: {
-    fontFamily: "DM_Mono_400Regular",
+    fontFamily: "DMMono_400Regular",
     fontSize: 11,
     color: Colors.textTertiary,
     letterSpacing: 0.3,
@@ -310,7 +305,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   input: {
-    fontFamily: "DM_Sans_400Regular",
+    fontFamily: "DMSans_400Regular",
     fontSize: 16,
     color: Colors.textPrimary,
     paddingHorizontal: 16,
@@ -337,7 +332,7 @@ const styles = StyleSheet.create({
     opacity: 0.45,
   },
   pillText: {
-    fontFamily: "DM_Sans_500Medium",
+    fontFamily: "DMSans_500Medium",
     fontSize: 14,
     color: Colors.textSecondary,
   },
@@ -373,7 +368,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accent,
   },
   ctaText: {
-    fontFamily: "DM_Sans_600SemiBold",
+    fontFamily: "DMSans_600SemiBold",
     fontSize: 16,
     color: Colors.textTertiary,
   },
