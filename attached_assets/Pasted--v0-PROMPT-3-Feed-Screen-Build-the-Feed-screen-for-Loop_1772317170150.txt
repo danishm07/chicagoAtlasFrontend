@@ -1,0 +1,99 @@
+### v0 PROMPT 3 — Feed Screen
+```
+Build the Feed screen for Loop Pulse.
+React/Next.js, Tailwind, shadcn/ui. 375px max-width.
+
+DESIGN SYSTEM:
+- Background: #F7F6F3
+- Surface/cards: #FFFFFF
+- Border: #E8E5DF  
+- Text primary: #1C1B18
+- Text secondary: #7C7870
+- Text tertiary: #B5B0A7
+- Accent: #E8533A
+- Success: #16A34A bg #EDF7F2
+- Warning: #B8860B bg #FDF8ED
+- Danger: #C8303A bg #FDF0F1
+- DePaul blue: #005596
+- Font: DM Sans, DM Mono for labels
+- Cards: 16px radius, shadow, scale(0.97) on tap
+
+FEED SCREEN LAYOUT:
+
+1. HEADER:
+- Title: "The Loop" (22px, bold, -0.03em tracking)
+- Subtitle: "Live from your neighborhood" (13px, secondary)
+
+2. FILTER TABS (segmented control style, not chips):
+White pill container, 3 tabs inside:
+Events | Spots | Trending
+Active tab: white background with shadow, dark text.
+Inactive: transparent, secondary text.
+Smooth sliding indicator animation between tabs.
+
+3. TAB CONTENT:
+
+EVENTS TAB (default active):
+Cards with image thumbnails (use placeholder gradient images,
+coral/blue/purple gradients as backgrounds since no real
+images). Each card:
+- Image area: 160px tall, full width, rounded top 16px
+  Overlay badges: 
+    Left top: colored category badge 
+    ("Game Day" = coral, "Tonight" = dark, "Free" = green)
+  Right bottom: price pill "From $18" white bg dark text
+- Below image: title (16px bold), time + distance row
+  (clock icon + "Tonight 7:00 PM", pin icon + "0.8 mi")
+- Bookmark icon top-right of card
+- Entire card tappable → onClick TODO comment
+
+Mock events:
+  1. "DePaul vs Marquette" — Game Day badge — From $18
+     Tonight 7:00 PM · 0.8 mi · gradient: DePaul blue
+  2. "Symphony Center" — Tonight badge — From $35  
+     Doors 6:30 PM · 0.3 mi · gradient: dark purple
+  3. "Chicago Cultural Center" — Free badge — Free
+     Open Now · 0.1 mi · gradient: warm coral
+  4. "Second City Comedy" — Tonight badge — From $22
+     8:00 PM · 0.6 mi · gradient: dark teal
+
+SPOTS TAB:
+List style, not cards with images. Each row:
+- Left: colored square icon (16px radius) with emoji
+- Center: name (13px bold) + category + price ($$) 
+- Right: wait time pill + distance
+- Bookmark icon
+- Row tappable → onClick TODO comment
+
+Mock spots:
+  🍜 Eleven City Diner — American $$ — 10 min — 0.2 mi
+  ☕ Intelligentsia Coffee — Coffee $ — No wait — 0.1 mi
+  🍱 Wow Bao — Asian $ — No wait — 0.1 mi
+  🥩 Gyu-Kaku Loop — Japanese BBQ $$$ — 25 min — 0.4 mi
+  🍕 Lou Malnati's — Pizza $$ — 20 min — 0.3 mi
+
+TRENDING TAB:
+List of trending items in a single white container card.
+Each row: 
+- Left: flame emoji in coral circle (32px)
+- Center: name (13px bold) + status tag below 
+  (DM Mono, uppercase, 10px: BUSY / TONIGHT / TRENDING / SPORTS)
+- Right: coral "Trending" pill badge
+Divider lines between rows.
+
+Mock items:
+  Millennium Park — BUSY
+  Symphony Center — TONIGHT  
+  Gyu-Kaku Loop — TRENDING
+  DePaul vs Marquette — SPORTS
+
+4. REFRESH INDICATOR:
+2px coral progress bar at very top of content area,
+animating over 60 seconds. Resets and refetches on complete.
+Subtle "Updated just now" text below filter tabs in DM Mono
+tertiary.
+
+All data hardcoded mock. TODO comments for real API calls:
+// TODO: fetch('/api/feed?filter=events&zone=depaul_loop')
+// TODO: fetch('/api/feed?filter=spots&zone=depaul_loop')
+// TODO: fetch('/api/feed?filter=trending&zone=depaul_loop')
