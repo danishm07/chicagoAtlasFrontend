@@ -10,7 +10,7 @@ export default function IndexGate() {
   useEffect(() => {
     if (isLoading) return;
     if (profile && profile.onboardedAt) {
-      router.replace("/home");
+      router.replace("/(tabs)");
     } else {
       router.replace("/onboarding/step1");
     }

@@ -17,6 +17,7 @@ import { useProfile } from "@/context/profile";
 
 const UNIVERSITIES = [
   { id: "depaul", label: "DePaul University", accent: Colors.depaul },
+  { id: "uic", label: "UIC — Loop Campus", accent: null },
   { id: "iit", label: "Illinois Institute of Technology", accent: null },
   { id: "columbia", label: "Columbia College Chicago", accent: null },
   { id: "roosevelt", label: "Roosevelt University", accent: null },
@@ -191,7 +192,7 @@ export default function OnboardingStep2() {
       onboardedAt: new Date().toISOString(),
     });
 
-    router.replace("/home");
+    router.replace("/(tabs)");
   };
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;

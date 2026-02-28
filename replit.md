@@ -1,96 +1,78 @@
-# Loop Pulse — replit.md
+# Loop Pulse
 
-## Overview
+A mobile PWA built with Expo Router (React Native), Express backend, and AsyncStorage for local persistence.
 
-Loop Pulse is a mobile-first city lifestyle app targeting Chicago's Loop neighborhood. It helps users (students, commuters, residents, visitors) track local events, food, safety, and zone-specific activity. The app is built with Expo (React Native) and includes a lightweight Express backend. The core user flow is:
+## Architecture
 
-1. **Onboarding** — Collect name, personas, interests, university, and home zone (2 steps)
-2. **Home** — Personalized feed based on the user's zone and interests
+- **Frontend**: Expo Router (file-based routing), React Native Web for browser
+- **Backend**: Express on port 5000 (serves landing page + API)
+- **Frontend dev server**: Expo Metro on port 8081
+- **State**: AsyncStorage via ProfileContext, React Query for server data
 
-The app stores profile data locally via AsyncStorage and also has a PostgreSQL database available via Drizzle ORM for server-side persistence.
+## Design System
 
----
+- Background: `#F7F6F3` | Surface: `#FFFFFF` | Border: `#E8E5DF`
+- Text: `#1C1B18` (primary), `#7C7870` (secondary), `#B5B0A7` (tertiary)
+- Accent (coral): `#E8533A` | Success: `#16A34A` | Danger: `#C8303A` | Warning: `#B8860B`
+- DePaul blue: `#005596`
+- Fonts: DM Sans (`DMSans_400Regular/500Medium/600SemiBold/700Bold`) + DM Mono (`DMMono_400Regular/500Medium`)
+- Card radius: 16px | Hero: 24px | Pills: 20px
+- All styles in `constants/colors.ts`
 
-## User Preferences
+## File Structure
 
-Preferred communication style: Simple, everyday language.
+```
+app/
+  _layout.tsx              # Root layout: fonts, providers, Stack nav
+  index.tsx                # Routing gate: checks profile → onboarding or tabs
+  onboarding/
+    step1.tsx              # Name, persona (max 2), interests (max 3)
+    step2.tsx              # University, home zone → saves to AsyncStorage
+  (tabs)/
+    _layout.tsx            # Tab bar: Pulse / Feed / Chat (NativeTabs or classic)
+    index.tsx              # Pulse home screen (full prompt 2 layout)
+    feed.tsx               # Feed placeholder
+    chat.tsx               # Chat placeholder
 
----
+context/
+  profile.tsx              # ProfileProvider + useProfile hook + AsyncStorage
 
-## System Architecture
+constants/
+  colors.ts                # Full design system color tokens
 
-### Frontend (React Native / Expo)
+server/
+  index.ts                 # Express setup, CORS, static serving
+  routes.ts                # API routes (currently empty)
+  storage.ts               # DB helpers
+```
 
-- **Framework**: Expo SDK ~54 with `expo-router` for file-based navigation
-- **Navigation**: Stack navigator defined in `app/_layout.tsx`. Routes include `/` (gate), `/onboarding/step1`, `/onboarding/step2`, and `/home`
-- **State Management**: React Context (`context/profile.tsx`) wraps the app with `ProfileProvider`, exposing profile CRUD methods. TanStack React Query (`@tanstack/react-query`) is set up for server data fetching via `lib/query-client.ts`
-- **Local Storage**: `@react-native-async-storage/async-storage` stores the user profile under the key `loop_pulse_profile`. The index screen reads this to decide whether to show onboarding or home
-- **Fonts**: DM Sans (body) and DM Mono (labels/timestamps) loaded via `@expo-google-fonts`
-- **UI Patterns**:
-  - Design tokens centralized in `constants/colors.ts` (background `#F7F6F3`, accent `#E8533A` coral, surface `#FFFFFF`, etc.)
-  - Animated pill buttons with haptic feedback (`expo-haptics`) for persona/interest/zone selection
-  - `KeyboardAwareScrollViewCompat` wraps forms — uses `react-native-keyboard-controller` on native, plain `ScrollView` on web
-  - `ErrorBoundary` + `ErrorFallback` for graceful crash recovery
-  - `GestureHandlerRootView` + `KeyboardProvider` wrap the entire app
+## Profile Shape (localStorage key: `loop_pulse_profile`)
 
-### Backend (Express)
+```json
+{
+  "name": "string",
+  "personas": ["Student", "Commuter"],
+  "interests": ["Food & Drinks", "Events & Shows"],
+  "university": "depaul | uic | iit | columbia | roosevelt | none",
+  "homeZone": "north | depaul_loop | west | south | gps",
+  "currentZone": "string",
+  "onboardedAt": "ISO string"
+}
+```
 
-- **Framework**: Express 5 running via `server/index.ts`
-- **API Routes**: Defined in `server/routes.ts` — currently a placeholder; all routes should be prefixed with `/api`
-- **Storage Layer**: `server/storage.ts` currently uses in-memory `MemStorage`. Designed around an `IStorage` interface for easy swap to database-backed storage
-- **CORS**: Configured to allow Replit dev/deployment domains and localhost origins dynamically using environment variables (`REPLIT_DEV_DOMAIN`, `REPLIT_DOMAINS`)
-- **Build**: Bundled with `esbuild` for production (`server_dist/`). Development uses `tsx` for hot reloading
+## Onboarding Logic
 
-### Database
+- On app load: `app/index.tsx` checks AsyncStorage for `loop_pulse_profile`
+- If `onboardedAt` is set → redirect to `/(tabs)` (home)
+- Otherwise → redirect to `/onboarding/step1`
 
-- **ORM**: Drizzle ORM with PostgreSQL dialect
-- **Schema**: `shared/schema.ts` defines a `users` table with `id` (UUID), `username`, and `password`. Zod schemas auto-generated via `drizzle-zod`
-- **Config**: `drizzle.config.ts` reads `DATABASE_URL` from environment
-- **Migrations**: Output to `./migrations`, applied with `drizzle-kit push`
-- **Note**: The current server storage layer (`MemStorage`) does NOT yet use Drizzle/Postgres. The database infrastructure is set up but the storage implementation needs to be wired in
+## Completed Prompts
 
-### Routing / API Communication
+- **Prompt 1**: Design system, onboarding steps 1 & 2, profile persistence, routing gate
+- **Prompt 2**: Full home screen (hero ring, data grid, game card, trending, alerts, chat preview, alert banner), tab navigation (Pulse/Feed/Chat), UIC added to university list
 
-- The mobile app communicates with the Express backend via `lib/query-client.ts`
-- `EXPO_PUBLIC_DOMAIN` env var sets the API base URL (auto-set in dev via `REPLIT_DEV_DOMAIN`)
-- `apiRequest()` utility handles fetch with JSON content-type and credential inclusion
+## Known Warnings (non-blocking)
 
-### Onboarding Flow
-
-- **Step 1** (`app/onboarding/step1.tsx`): Name input + persona multi-select (max 2) + interests multi-select (max 3). Passes data to step 2 via route params
-- **Step 2** (`app/onboarding/step2.tsx`): University selection (5 options including DePaul with blue accent) + home zone selection. On completion, saves full profile via `ProfileProvider.saveProfile()` and navigates to `/home`
-- **Gate** (`app/index.tsx`): Checks profile and `onboardedAt` field — routes to onboarding or home accordingly
-
----
-
-## External Dependencies
-
-| Dependency | Purpose |
-|---|---|
-| `expo-router` | File-based navigation for React Native |
-| `@tanstack/react-query` | Server state fetching and caching |
-| `@react-native-async-storage/async-storage` | Local profile persistence |
-| `drizzle-orm` + `drizzle-zod` | PostgreSQL ORM + schema validation |
-| `pg` | PostgreSQL client for Node.js |
-| `express` | Backend HTTP server |
-| `expo-haptics` | Tactile feedback on pill selection |
-| `expo-image-picker` | Image selection (available, not yet used in visible screens) |
-| `expo-location` | Location access (available, not yet used in visible screens) |
-| `expo-linear-gradient` | Gradient UI elements |
-| `react-native-reanimated` | Advanced animations |
-| `react-native-gesture-handler` | Gesture support |
-| `react-native-keyboard-controller` | Keyboard-aware scroll behavior on native |
-| `react-native-safe-area-context` | Safe area insets across devices |
-| `@expo-google-fonts/dm-sans` + `dm-mono` | Custom fonts |
-| `@expo/vector-icons` (Feather, MaterialIcons) | Icon sets |
-| `http-proxy-middleware` | Dev proxy for Replit environment |
-
-### Environment Variables Required
-
-| Variable | Purpose |
-|---|---|
-| `DATABASE_URL` | PostgreSQL connection string for Drizzle |
-| `EXPO_PUBLIC_DOMAIN` | API base URL used by the mobile app |
-| `REPLIT_DEV_DOMAIN` | Auto-set by Replit for CORS and proxy config |
-| `REPLIT_DOMAINS` | Comma-separated production domains for CORS |
-| `REPLIT_INTERNAL_APP_DOMAIN` | Used in build scripts for deployment domain detection |
+- `shadow*` style props deprecated on web → use `boxShadow` (harmless warning)
+- `useNativeDriver` not supported on web → falls back to JS animations (normal)
+- `props.pointerEvents` deprecated → internal React Native web warning
