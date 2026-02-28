@@ -1,0 +1,119 @@
+### v0 PROMPT 4 — Chat Screen
+```
+Build the Chat screen for Loop Pulse.
+React/Next.js, Tailwind, shadcn/ui. 375px max-width.
+Keyboard-aware layout — message area scrolls internally,
+input stays pinned above keyboard.
+
+DESIGN SYSTEM:
+- Background: #F7F6F3
+- Surface/cards: #FFFFFF
+- Border: #E8E5DF
+- Text primary: #1C1B18
+- Text secondary: #7C7870
+- Text tertiary: #B5B0A7
+- Accent: #E8533A
+- Success green: #16A34A
+- Font: DM Sans, DM Mono for labels/timestamps/source chips
+
+CHAT SCREEN LAYOUT (fixed height, no page scroll):
+
+1. HEADER BAR (white bg, bottom border):
+- Left: coral rounded square avatar with ◈ star icon
+- Center column: 
+  "Pulse AI" — 15px bold
+  Row below: pulsing green dot + "Live Chicago data active"
+  in DM Mono 10px green
+- Right: no buttons needed
+
+2. CONTEXT PILL (top of message area):
+Rounded pill, #F0EEE9 bg, DM Mono 10px tertiary:
+"📍 DePaul Loop · Student · 5 sources active"
+
+3. MESSAGE AREA (flex-1, internal scroll, 16px padding):
+
+User messages:
+- Right-aligned
+- #1C1B18 bg, white text, 14px
+- 14px padding, radius 16px, bottom-right 4px
+- Timestamp below: DM Mono 10px tertiary, right-aligned
+
+AI messages:
+- Left-aligned  
+- White bg, subtle shadow, 14px
+- 14px padding, radius 16px, bottom-left 4px
+- BELOW bubble: horizontal row of source chips
+  Each chip: #F0EEE9 bg, DM Mono 10px, 6px radius
+  Example: "Chicago 311" "Yelp Fusion" "Ticketmaster"
+- Timestamp below: DM Mono 10px tertiary, left-aligned
+
+Typing indicator (3 animated dots, same as AI bubble style).
+
+Mock conversation to show on load:
+AI: "Hey Danish 👋 I'm plugged into live Loop data. 
+     What do you want to know about the Loop right now?"
+     Sources: [Chicago 311] [Yelp] [CTA Alerts]
+
+User: "what should i do near depaul for 2 hours under $20"
+
+AI: "Here's what I'd do right now:\n
+     🍜 Eleven City Diner — 10 min wait (shorter than 
+     usual). Burgers from $13.\n
+     🎭 Chicago Cultural Center — free admission, 
+     great current exhibit, 0.1 mi away.\n
+     🏀 DePaul vs Marquette tonight at 7PM — 
+     student rush $18 at the door.\n
+     All within a 12 min walk from DePaul Loop campus."
+     Sources: [Yelp Fusion] [Ticketmaster] [Chicago 311]
+
+4. QUICK PROMPT CHIPS (horizontal scroll, above input):
+White chips with border, coral on hover/tap:
+"What to do under $20?" 
+"Is it safe to walk right now?"
+"Best coffee nearby?"
+"How busy is the Loop?"
+"Any free events today?"
+Tapping sends chip text as user message.
+
+5. INPUT ROW (pinned bottom, white bg, top border):
+- Rounded input field (flex-1): placeholder 
+  "Ask about the Loop right now..."
+- Circular send button (42px, #1C1B18 bg, white arrow)
+  Turns coral (#E8533A) on hover
+- Enter key sends
+
+6. MOCK AI RESPONSE LOGIC:
+When user sends a message, show typing indicator for 1.5s,
+then show a contextual mock response based on keywords:
+- "safe" / "walk" → safety response with 311 data
+- "food" / "eat" / "cheap" → spots with wait times
+- "busy" / "crowd" → density response  
+- "event" / "do" / "tonight" → events response
+- default → general Loop status response
+
+Every AI response includes 2-3 source chips.
+
+TODO comment:
+// TODO: Replace mock responses with POST /api/chat
+// Body: { message, history, persona, university, 
+//         currentZone, savedItems }
+// Response: streaming text from Groq Llama 3.3 70B
+// System prompt injects all live Chicago data as context
+```
+
+---
+
+## Step 3 — After v0 Generates Each Screen
+
+For each screen, do this:
+```
+1. Copy ALL code from v0
+2. Create the file in your Next.js project:
+   - Onboarding → app/onboard/page.tsx
+   - Home → app/home/page.tsx  
+   - Feed → app/feed/page.tsx
+   - Chat → app/chat/page.tsx
+3. Paste the code
+4. Run npm run dev and check for errors
+5. Fix any import errors (usually missing shadcn components)
+6. Git commit after each screen works

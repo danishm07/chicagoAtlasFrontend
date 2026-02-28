@@ -31,8 +31,8 @@ app/
   (tabs)/
     _layout.tsx            # Tab bar: Pulse / Feed / Chat (NativeTabs or classic)
     index.tsx              # Pulse home screen (full prompt 2 layout)
-    feed.tsx               # Feed placeholder
-    chat.tsx               # Chat placeholder
+    feed.tsx               # Feed screen: Events/Spots/Trending segmented tabs, 60s coral progress bar
+    chat.tsx               # Chat screen: Pulse AI, inverted FlatList, quick chips, mock keyword responses
 
 context/
   profile.tsx              # ProfileProvider + useProfile hook + AsyncStorage
@@ -70,6 +70,8 @@ server/
 
 - **Prompt 1**: Design system, onboarding steps 1 & 2, profile persistence, routing gate
 - **Prompt 2**: Full home screen (hero ring, data grid, game card, trending, alerts, chat preview, alert banner), tab navigation (Pulse/Feed/Chat), UIC added to university list
+- **Prompt 3**: Feed screen — 60s coral refresh bar, spring-animated segmented control (Events/Spots/Trending), gradient event cards, spots list with wait-time pills, trending rows with flame icons
+- **Prompt 4**: Chat screen — Pulse AI header with pulsing green dot, context pill, inverted FlatList with user/AI bubbles + source chips, 3-dot typing indicator, 5 quick-prompt chips, keyword-based mock AI responses
 
 ## Known Warnings (non-blocking)
 
