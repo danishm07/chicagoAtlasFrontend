@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -14,6 +14,29 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import Colors, { CHICAGO_SIDES } from "@/constants/colors";
 
+function PulsingDot({ selected }: { selected: boolean }) {
+  const scale = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(scale, { toValue: 1.5, duration: 700, useNativeDriver: false }),
+        Animated.timing(scale, { toValue: 1, duration: 700, useNativeDriver: false }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, []);
+  return (
+    <View style={{ width: 10, height: 10, alignItems: "center", justifyContent: "center" }}>
+      <Animated.View style={{
+        width: 10, height: 10, borderRadius: 5,
+        backgroundColor: selected ? Colors.accent : Colors.textTertiary,
+        transform: [{ scale }],
+      }} />
+    </View>
+  );
+}
+
 export default function OnboardingStep3() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
@@ -23,7 +46,7 @@ export default function OnboardingStep3() {
     sportsNotifications?: string;
     interests?: string;
   }>();
-  const [homeZone, setHomeZone] = useState("");
+  const [homeZone, setHomeZone] = useState("gps");
   const ctaScale = useRef(new Animated.Value(1)).current;
 
   const handleContinue = () => {
@@ -63,6 +86,31 @@ export default function OnboardingStep3() {
         <Text style={styles.heading}>Where are{"\n"}you based?</Text>
 
         <View style={styles.cardList}>
+          <Pressable
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setHomeZone("gps");
+            }}
+            style={({ pressed }) => [
+              styles.card,
+              homeZone === "gps" && styles.cardSelected,
+              pressed && { opacity: 0.8 },
+            ]}
+          >
+            <PulsingDot selected={homeZone === "gps"} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.cardLabel, homeZone === "gps" && styles.cardLabelSelected]}>
+                Use my GPS
+              </Text>
+              <Text style={[styles.cardSub, homeZone === "gps" && { color: Colors.accent }]}>
+                Detect my neighborhood automatically
+              </Text>
+            </View>
+            <View style={[styles.radioOuter, homeZone === "gps" && styles.radioOuterSelected]}>
+              {homeZone === "gps" && <View style={styles.radioInner} />}
+            </View>
+          </Pressable>
+
           {CHICAGO_SIDES.map((z) => {
             const selected = homeZone === z.id;
             return (
@@ -132,7 +180,8 @@ const styles = StyleSheet.create({
   },
   cardSelected: { borderColor: Colors.accent, backgroundColor: "#FEF0ED" },
   colorDot: { width: 10, height: 10, borderRadius: 5 },
-  cardLabel: { flex: 1, fontSize: 15, fontWeight: "500", color: Colors.textPrimary },
+  cardLabel: { fontSize: 15, fontWeight: "500", color: Colors.textPrimary },
+  cardSub: { fontSize: 12, color: Colors.textTertiary, marginTop: 2 },
   cardLabelSelected: { color: Colors.accent, fontWeight: "600" },
   radioOuter: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: Colors.border, alignItems: "center", justifyContent: "center" },
   radioOuterSelected: { borderColor: Colors.accent },

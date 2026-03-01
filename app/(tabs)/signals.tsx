@@ -30,49 +30,49 @@ const WIDGETS = [
   {
     id: "safety",
     name: "Safety",
-    icon: "🛡️",
+    icon: "shield-outline",
     getValue: () => `${MOCK_SCORE.safety.incidents} incidents`,
     sub: "Last 6 hours · 800m radius",
   },
   {
     id: "transit",
     name: "Transit",
-    icon: "🚇",
+    icon: "train-outline",
     getValue: () => MOCK_SCORE.transit.status.includes("normally") ? "All clear" : "Delays",
     sub: "CTA status right now",
   },
   {
     id: "air",
     name: "Air Quality",
-    icon: "🌿",
+    icon: "leaf-outline",
     getValue: () => `AQI ${MOCK_SCORE.air.aqi}`,
     sub: `${MOCK_SCORE.air.category} · Safe outdoors`,
   },
   {
     id: "weather",
     name: "Weather",
-    icon: "☀️",
+    icon: "partly-sunny-outline",
     getValue: () => MOCK_SCORE.weather.temp,
     sub: `Feels like ${MOCK_SCORE.weather.feelsLike}`,
   },
   {
     id: "crowds",
     name: "Crowds",
-    icon: "👥",
+    icon: "people-outline",
     getValue: () => "Moderate",
     sub: "Based on events + time",
   },
   {
     id: "events",
     name: "Events",
-    icon: "🎟️",
+    icon: "calendar-outline",
     getValue: () => `${MOCK_SCORE.events} today`,
     sub: "Near your zone",
   },
   {
     id: "reports",
     name: "Reports",
-    icon: "⚠️",
+    icon: "alert-circle-outline",
     getValue: () => `${MOCK_REPORTS.length} nearby`,
     sub: "User-submitted reports",
   },
@@ -149,7 +149,7 @@ function SlotPicker({
       </Pressable>
 
       <Animated.View style={[styles.slotMiddle, { transform: [{ translateY: itemAnim }] }]}>
-        <Text style={styles.slotIcon}>{current.icon}</Text>
+        <Ionicons name={current.icon as any} size={26} color={C.textPrimary} />
         <Text style={[styles.slotName, { color: C.textPrimary }]}>{current.name}</Text>
         <Text style={[styles.slotSub, { color: C.textTertiary }]} numberOfLines={1}>{current.sub}</Text>
       </Animated.View>
@@ -277,7 +277,7 @@ export default function SignalsTab() {
                 ]}
               >
                 <View style={styles.widgetTop}>
-                  <Text style={styles.widgetIcon}>{widget.icon}</Text>
+                  <Ionicons name={widget.icon as any} size={22} color={C.textPrimary} />
                 </View>
                 <View style={styles.widgetBody}>
                   <Text style={[styles.widgetName, { color: C.textPrimary }]}>{widget.name}</Text>
@@ -411,7 +411,6 @@ const styles = StyleSheet.create({
     shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4,
   },
   widgetTop: { alignItems: "flex-start" },
-  widgetIcon: { fontSize: 22 },
   widgetBody: { gap: 3 },
   widgetName: { fontSize: 16, fontWeight: "700", letterSpacing: -0.2 },
   widgetValue: { fontSize: 20, fontWeight: "700", letterSpacing: -0.3 },
@@ -432,7 +431,6 @@ const styles = StyleSheet.create({
   },
   slotArrowBtn: { paddingHorizontal: 16, paddingVertical: 6 },
   slotMiddle: { alignItems: "center", gap: 4, flex: 1, justifyContent: "center", paddingHorizontal: 8 },
-  slotIcon: { fontSize: 24 },
   slotName: { fontSize: 14, fontWeight: "700", textAlign: "center" },
   slotSub: { fontSize: 11, textAlign: "center", lineHeight: 14 },
   slotConfirm: {

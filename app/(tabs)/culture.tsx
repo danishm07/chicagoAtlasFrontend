@@ -25,11 +25,25 @@ const TRENDING = [
   { id: "t4", icon: "🏀", iconBg: "#C8303A", name: "United Center", category: "SPORTS", trend: "up" as const, trendLabel: "↑ Bulls game 7:30PM", sparkData: [1, 2, 3, 4, 5, 6, 8, 9, 10, 10] },
 ];
 
-const DISCOVER = [
-  { id: "d1", featured: true, category: "FEATURED", name: "Intelligentsia Coffee", description: "Quieter than usual for a Saturday — no wait right now", distance: "0.1 mi", price: "$", open: "Open now" },
-  { id: "d2", featured: false, category: "CULTURE", name: "Chicago Cultural Center", description: "Free admission, current exhibit closing this week", distance: "0.2 mi", price: "Free", open: "Open now" },
-  { id: "d3", featured: false, category: "BAR", name: "The Berghoff Bar", description: "Happy hour until 7PM, usually mellow on weeknights", distance: "0.3 mi", price: "$$", open: "Open now" },
-  { id: "d4", featured: false, category: "JAZZ", name: "Andy's Jazz Club", description: "Live set starts 9PM, $10 cover — real Chicago jazz", distance: "0.4 mi", price: "$$", open: "Open · 9PM show" },
+const DISCOVER_SETS = [
+  [
+    { id: "d1", featured: true, category: "FEATURED", name: "Intelligentsia Coffee", description: "Quieter than usual for a Saturday — no wait right now", distance: "0.1 mi", price: "$", open: "Open now" },
+    { id: "d2", featured: false, category: "CULTURE", name: "Chicago Cultural Center", description: "Free admission, current exhibit closing this week", distance: "0.2 mi", price: "Free", open: "Open now" },
+    { id: "d3", featured: false, category: "BAR", name: "The Berghoff Bar", description: "Happy hour until 7PM, usually mellow on weeknights", distance: "0.3 mi", price: "$$", open: "Open now" },
+    { id: "d4", featured: false, category: "JAZZ", name: "Andy's Jazz Club", description: "Live set starts 9PM, $10 cover — real Chicago jazz", distance: "0.4 mi", price: "$$", open: "Open · 9PM show" },
+  ],
+  [
+    { id: "d1", featured: true, category: "FEATURED", name: "Intelligentsia Coffee", description: "About a 20 min wait — filling up fast this afternoon", distance: "0.1 mi", price: "$", open: "Open now" },
+    { id: "d2", featured: false, category: "CULTURE", name: "Chicago Cultural Center", description: "Last day of the current exhibit — free, worth seeing", distance: "0.2 mi", price: "Free", open: "Open now" },
+    { id: "d3", featured: false, category: "BAR", name: "The Berghoff Bar", description: "Happy hour ending soon, bar is starting to pick up", distance: "0.3 mi", price: "$$", open: "Open now" },
+    { id: "d4", featured: false, category: "JAZZ", name: "Andy's Jazz Club", description: "Doors open at 8PM, grab a seat before the rush", distance: "0.4 mi", price: "$$", open: "Opens 8PM" },
+  ],
+  [
+    { id: "d1", featured: true, category: "FEATURED", name: "Intelligentsia Coffee", description: "Just opened up — no wait, great window seats available", distance: "0.1 mi", price: "$", open: "Open now" },
+    { id: "d2", featured: false, category: "CULTURE", name: "Chicago Cultural Center", description: "Sold out tomorrow — free tonight only, walk right in", distance: "0.2 mi", price: "Free", open: "Open now" },
+    { id: "d3", featured: false, category: "BAR", name: "The Berghoff Bar", description: "Mellow tonight, easy to get a table at the bar", distance: "0.3 mi", price: "$$", open: "Open now" },
+    { id: "d4", featured: false, category: "JAZZ", name: "Andy's Jazz Club", description: "Late set at 11PM added — intimate crowd, killer lineup", distance: "0.4 mi", price: "$$", open: "Open · 11PM late set" },
+  ],
 ];
 
 const TONIGHT_CYCLE = [
@@ -90,10 +104,11 @@ export default function CultureTab() {
   const { saveItem, unsaveItem, isSaved, panelOpen, closePanel } = useSaved();
   const [tab, setTab] = useState("trending");
   const [cycleIdx, setCycleIdx] = useState(0);
+  const [discoverVersion, setDiscoverVersion] = useState(0);
 
   const bottomPad = Platform.OS === "web" ? 84 : insets.bottom + 80;
 
-  const handleBookmark = (item: typeof DISCOVER[0]) => {
+  const handleBookmark = (item: typeof DISCOVER_SETS[0][0]) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (isSaved(item.id)) {
       unsaveItem(item.id);
@@ -160,6 +175,7 @@ export default function CultureTab() {
               <Pressable
                 onPress={() => {
                   setCycleIdx((prev) => (prev + 1) % TONIGHT_CYCLE.length);
+                  setDiscoverVersion((prev) => (prev + 1) % DISCOVER_SETS.length);
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 }}
                 style={({ pressed }) => [styles.cycleBtn, { backgroundColor: C.border, opacity: pressed ? 0.7 : 1 }]}
@@ -173,7 +189,7 @@ export default function CultureTab() {
               <Text style={styles.featuredPickText}>{TONIGHT_CYCLE[cycleIdx]}</Text>
             </View>
 
-            {DISCOVER.map((item) => (
+            {DISCOVER_SETS[discoverVersion].map((item) => (
               <View key={item.id} style={[styles.discoverCard, { backgroundColor: C.surface, borderColor: C.border }]}>
                 <View style={styles.discoverCardTop}>
                   <View style={[styles.catPill, item.featured && styles.catPillFeatured, !item.featured && { backgroundColor: C.border }]}>

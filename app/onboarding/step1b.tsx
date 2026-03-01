@@ -120,7 +120,7 @@ export default function OnboardingStep1b() {
       </ScrollView>
 
       <View style={[styles.ctaWrapper, { paddingBottom: bottomPad + 16 }]}>
-        <Pressable onPress={handleContinue}>
+        <Pressable onPress={handleContinue} style={{ width: "100%" }}>
           <Animated.View style={[styles.ctaButton, { transform: [{ scale: ctaScale }] }]}>
             <Text style={styles.ctaText}>Continue</Text>
             <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
@@ -230,7 +230,6 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: Colors.border,
     gap: 12,
-    alignItems: "center",
   },
   ctaButton: {
     width: "100%",
@@ -243,6 +242,6 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   ctaText: { fontSize: 16, fontWeight: "600", color: "#FFFFFF" },
-  skipBtn: { paddingVertical: 4 },
+  skipBtn: { paddingVertical: 4, alignItems: "center" },
   skipText: { fontSize: 14, color: Colors.textTertiary },
 });

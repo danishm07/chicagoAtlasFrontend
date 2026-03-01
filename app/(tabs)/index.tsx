@@ -155,8 +155,9 @@ export default function AskTab() {
   const chipsOpacity = useRef(new Animated.Value(1)).current;
   const chipsY = useRef(new Animated.Value(0)).current;
   const emptyOpacity = useRef(new Animated.Value(1)).current;
+  const inputBarOpacity = useRef(new Animated.Value(0)).current;
 
-  const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
+  const bottomPad = Platform.OS === "web" ? 84 : insets.bottom + 80;
 
   const sendMessage = useCallback(
     async (text: string) => {
@@ -172,6 +173,7 @@ export default function AskTab() {
           Animated.timing(chipsOpacity, { toValue: 0, duration: 200, useNativeDriver: true }),
           Animated.timing(chipsY, { toValue: 36, duration: 220, useNativeDriver: true }),
           Animated.timing(emptyOpacity, { toValue: 0, duration: 320, useNativeDriver: true }),
+          Animated.timing(inputBarOpacity, { toValue: 1, duration: 280, useNativeDriver: true }),
         ]).start(() => setEmptyMounted(false));
       }
 
@@ -311,8 +313,8 @@ export default function AskTab() {
         )}
       </View>
 
-      {hasStarted && (
-        <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={0} style={{ backgroundColor: C.background }}>
+      <Animated.View style={[{ opacity: inputBarOpacity, backgroundColor: C.background }, { pointerEvents: hasStarted ? "auto" : "none" } as any]}>
+        <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={0}>
           <View style={[styles.inputBar, { borderTopColor: C.border }]}>
             <TextInput
               style={[styles.input, { backgroundColor: C.surface, borderColor: C.border, color: C.textPrimary }]}
@@ -338,7 +340,7 @@ export default function AskTab() {
           </View>
           <View style={{ height: bottomPad + 16 }} />
         </KeyboardAvoidingView>
-      )}
+      </Animated.View>
 
       <SavedPanel isOpen={panelOpen} onClose={closePanel} />
     </View>
