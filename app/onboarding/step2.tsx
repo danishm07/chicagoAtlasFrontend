@@ -85,8 +85,8 @@ export default function OnboardingStep2() {
           <Ionicons name="arrow-back" size={20} color={Colors.textSecondary} />
         </Pressable>
 
-        <Text style={styles.heading}>What are you into?</Text>
-        <Text style={styles.subtitle}>Pick up to 3 — Harold will tailor what he shows you.</Text>
+        <Text style={styles.heading}>What are{"\n"}you into?</Text>
+        <Text style={styles.subtitle}>Tailor your experience (Pick up to 3)</Text>
 
         <View style={styles.pillRow}>
           {INTERESTS.map((item) => {
@@ -113,10 +113,10 @@ export default function OnboardingStep2() {
       </ScrollView>
 
       <View style={[styles.ctaWrapper, { paddingBottom: bottomPad + 16 }]}>
-        <Pressable onPress={() => goNext()}>
+        <Pressable onPress={() => goNext()} style={{ width: "100%" }}>
           <Animated.View style={[styles.ctaButton, { transform: [{ scale: ctaScale }] }]}>
             <Text style={styles.ctaText}>Continue</Text>
-            <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+            <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
           </Animated.View>
         </Pressable>
         <Pressable onPress={() => goNext(true)} style={styles.skipBtn}>
@@ -138,37 +138,25 @@ const styles = StyleSheet.create({
   heading: { fontSize: 34, fontWeight: "700", color: Colors.textPrimary, letterSpacing: -0.8, lineHeight: 40, marginBottom: 8 },
   subtitle: { fontSize: 16, color: Colors.textSecondary, lineHeight: 24, marginBottom: 28 },
   pillRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  pill: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 24,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    backgroundColor: Colors.surface,
-  },
+  pill: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 24, borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.surface },
   pillSelected: { borderColor: Colors.accent, backgroundColor: "#FEF0ED" },
   pillDisabled: { opacity: 0.4 },
   pillText: { fontSize: 14, fontWeight: "500", color: Colors.textSecondary },
   pillTextSelected: { color: Colors.accent, fontWeight: "600" },
   pillTextDisabled: { color: Colors.textTertiary },
   ctaWrapper: {
-    position: "absolute",
-    bottom: 0, left: 0, right: 0,
+    position: "absolute", bottom: 0, left: 0, right: 0,
     paddingHorizontal: 24, paddingTop: 16,
     backgroundColor: Colors.background,
     borderTopWidth: 1, borderTopColor: Colors.border,
     gap: 12, alignItems: "center",
   },
   ctaButton: {
-    width: "100%",
-    backgroundColor: Colors.textPrimary,
-    borderRadius: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8, paddingVertical: 16,
+    width: "100%", backgroundColor: Colors.textPrimary, borderRadius: 14,
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 8, paddingVertical: 15,
   },
-  ctaText: { fontSize: 16, fontWeight: "600", color: "#FFFFFF" },
+  ctaText: { fontSize: 15, fontWeight: "600", color: "#FFFFFF" },
   skipBtn: { paddingVertical: 4 },
   skipText: { fontSize: 14, color: Colors.textTertiary },
 });

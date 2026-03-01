@@ -3,105 +3,96 @@ import {
   View,
   Text,
   Pressable,
-  ScrollView,
   StyleSheet,
-  Platform,
+  ScrollView,
   Switch,
-  TextInput,
+  Platform,
   Modal,
-  Alert,
 } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import Colors from "@/constants/colors";
 import { useProfile } from "@/context/profile";
-import { useTheme } from "@/context/theme";
-
-function SectionHeader({ title }: { title: string }) {
-  return <Text style={styles.sectionHeader}>{title}</Text>;
-}
-
-function RowItem({
-  label,
-  value,
-  onPress,
-  rightElement,
-  danger,
-}: {
-  label: string;
-  value?: string;
-  onPress?: () => void;
-  rightElement?: React.ReactNode;
-  danger?: boolean;
-}) {
-  return (
-    <Pressable
-      style={({ pressed }) => [
-        styles.row,
-        pressed && onPress ? { opacity: 0.7 } : null,
-      ]}
-      onPress={onPress}
-      disabled={!onPress}
-    >
-      <Text style={[styles.rowLabel, danger && styles.rowLabelDanger]}>{label}</Text>
-      {value ? <Text style={styles.rowValue}>{value}</Text> : null}
-      {rightElement ? rightElement : null}
-      {onPress && !rightElement ? (
-        <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
-      ) : null}
-    </Pressable>
-  );
-}
-
-function Divider() {
-  return <View style={styles.divider} />;
-}
+import { useTheme, useColors } from "@/context/theme";
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { profile, updateProfile, clearProfile } = useProfile();
-  const { isDark, toggle: toggleTheme } = useTheme();
-
-  const [resetModal, setResetModal] = useState(false);
-  const [editContactModal, setEditContactModal] = useState(false);
-  const [contactName, setContactName] = useState(profile?.emergencyContact?.name ?? "");
-  const [contactPhone, setContactPhone] = useState(profile?.emergencyContact?.phone ?? "");
-
-  const safetyAlerts = profile?.safetyAlerts ?? profile?.notifySafety ?? false;
-  const trainAlerts = profile?.trainAlerts ?? false;
-  const sportsEvents =
-    profile?.sportsNotifications ??
-    (profile?.personas?.includes("student") || profile?.interests?.includes("sports") ? false : undefined);
-  const showSports = sportsEvents !== undefined || profile?.personas?.includes("student") || profile?.interests?.includes("sports");
+  const { isDark, isVivid, toggleDark, toggleVivid } = useTheme();
+  const C = useColors();
+  const [resetModalVisible, setResetModalVisible] = useState(false);
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
+  const isStudent = profile?.personas?.includes("student") || profile?.interests?.includes("sports");
 
   const handleReset = async () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     await clearProfile();
-    setResetModal(false);
+    setResetModalVisible(false);
     router.replace("/splash");
   };
 
-  const saveContact = async () => {
-    await updateProfile({
-      emergencyContact:
-        contactName ? { name: contactName, phone: contactPhone } : null,
-    });
-    setEditContactModal(false);
-  };
+  function SectionLabel({ label }: { label: string }) {
+    return <Text style={[styles.sectionLabel, { color: C.textTertiary }]}>{label}</Text>;
+  }
+
+  function ToggleRow({ label, desc, value, onValueChange, trackOn, last }: {
+    label: string; desc?: string; value: boolean; onValueChange: (v: boolean) => void; trackOn?: string; last?: boolean;
+  }) {
+    return (
+      <View style={[styles.row, !last && { borderBottomWidth: 1, borderBottomColor: C.border }]}>
+        <View style={styles.rowText}>
+          <Text style={[styles.rowLabel, { color: C.textPrimary }]}>{label}</Text>
+          {!!desc && <Text style={[styles.rowDesc, { color: C.textTertiary }]}>{desc}</Text>}
+        </View>
+        <Switch
+          value={value}
+          onValueChange={onValueChange}
+          trackColor={{ false: C.border, true: trackOn ?? "#E8533A" }}
+          thumbColor="#FFFFFF"
+        />
+      </View>
+    );
+  }
+
+  function NavRow({ label, desc, value, onPress, danger, last }: {
+    label: string; desc?: string; value?: string; onPress: () => void; danger?: boolean; last?: boolean;
+  }) {
+    return (
+      <Pressable
+        onPress={onPress}
+        style={({ pressed }) => [styles.row, !last && { borderBottomWidth: 1, borderBottomColor: C.border }, { opacity: pressed ? 0.7 : 1 }]}
+      >
+        <View style={styles.rowText}>
+          <Text style={[styles.rowLabel, { color: danger ? "#C8303A" : C.textPrimary }]}>{label}</Text>
+          {!!desc && <Text style={[styles.rowDesc, { color: C.textTertiary }]}>{desc}</Text>}
+        </View>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+          {!!value && <Text style={[styles.rowValue, { color: C.textSecondary }]}>{value}</Text>}
+          <Ionicons name="chevron-forward" size={16} color={C.textTertiary} />
+        </View>
+      </Pressable>
+    );
+  }
+
+  function InfoRow({ label, value, last }: { label: string; value: string; last?: boolean }) {
+    return (
+      <View style={[styles.row, !last && { borderBottomWidth: 1, borderBottomColor: C.border }]}>
+        <Text style={[styles.rowLabel, { color: C.textPrimary }]}>{label}</Text>
+        <Text style={[styles.rowValue, { color: C.textSecondary }]}>{value}</Text>
+      </View>
+    );
+  }
 
   return (
-    <View style={[styles.root, { paddingTop: topPad }]}>
-      <View style={styles.header}>
-        <Pressable style={styles.backBtn} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
+    <View style={[styles.root, { backgroundColor: C.background, paddingTop: topPad }]}>
+      <View style={[styles.header, { borderBottomColor: C.border }]}>
+        <Pressable onPress={() => router.back()} style={({ pressed }) => [styles.backBtn, { opacity: pressed ? 0.6 : 1 }]}>
+          <Ionicons name="arrow-back" size={22} color={C.textPrimary} />
         </Pressable>
-        <Text style={styles.headerTitle}>Settings</Text>
-        <View style={{ width: 36 }} />
+        <Text style={[styles.headerTitle, { color: C.textPrimary }]}>Settings</Text>
+        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView
@@ -109,243 +100,122 @@ export default function SettingsScreen() {
         contentContainerStyle={[styles.content, { paddingBottom: bottomPad + 32 }]}
         showsVerticalScrollIndicator={false}
       >
-        <SectionHeader title="APPEARANCE" />
-        <View style={styles.card}>
-          <RowItem
+        <SectionLabel label="APPEARANCE" />
+        <View style={[styles.card, { backgroundColor: C.surface, borderColor: C.border }]}>
+          <ToggleRow
             label="Dark Mode"
-            rightElement={
-              <Switch
-                value={isDark}
-                onValueChange={toggleTheme}
-                trackColor={{ false: Colors.border, true: Colors.accent }}
-                thumbColor="#FFFFFF"
-              />
-            }
+            desc="Easier on the eyes in low light"
+            value={isDark}
+            onValueChange={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); toggleDark(); }}
+          />
+          <ToggleRow
+            label="Vivid Mode"
+            desc="High contrast — easier to read for all users"
+            value={isVivid}
+            onValueChange={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); toggleVivid(); }}
+            last
           />
         </View>
 
-        <SectionHeader title="NOTIFICATIONS" />
-        <View style={styles.card}>
-          <RowItem
+        <SectionLabel label="NOTIFICATIONS" />
+        <View style={[styles.card, { backgroundColor: C.surface, borderColor: C.border }]}>
+          <ToggleRow
             label="Safety Alerts"
-            rightElement={
-              <Switch
-                value={safetyAlerts}
-                onValueChange={(v) => updateProfile({ safetyAlerts: v, notifySafety: v })}
-                trackColor={{ false: Colors.border, true: Colors.accent }}
-                thumbColor="#FFFFFF"
-              />
-            }
+            desc="Serious incidents near you"
+            value={!!profile?.safetyAlerts}
+            onValueChange={(v) => updateProfile({ safetyAlerts: v })}
           />
-          <Divider />
-          {showSports && (
-            <>
-              <RowItem
-                label="Sports Events"
-                rightElement={
-                  <Switch
-                    value={profile?.sportsNotifications ?? false}
-                    onValueChange={(v) => updateProfile({ sportsNotifications: v })}
-                    trackColor={{ false: Colors.border, true: Colors.accent }}
-                    thumbColor="#FFFFFF"
-                  />
-                }
-              />
-              <Divider />
-            </>
+          {isStudent && (
+            <ToggleRow
+              label="Sports Events"
+              desc="Your school's game notifications"
+              value={!!profile?.sportsNotifications}
+              onValueChange={(v) => updateProfile({ sportsNotifications: v })}
+            />
           )}
-          <RowItem
+          <ToggleRow
             label="Train Alerts"
-            rightElement={
-              <Switch
-                value={trainAlerts}
-                onValueChange={(v) => updateProfile({ trainAlerts: v })}
-                trackColor={{ false: Colors.border, true: Colors.accent }}
-                thumbColor="#FFFFFF"
-              />
-            }
+            desc="CTA nudges when your train arrives"
+            value={!!profile?.trainAlerts}
+            onValueChange={(v) => updateProfile({ trainAlerts: v })}
+            last
           />
         </View>
 
-        <SectionHeader title="EMERGENCY" />
-        <View style={styles.card}>
-          <RowItem
-            label="Emergency Contact"
-            value={profile?.emergencyContact?.name ?? "Not set"}
-            onPress={() => {
-              setContactName(profile?.emergencyContact?.name ?? "");
-              setContactPhone(profile?.emergencyContact?.phone ?? "");
-              setEditContactModal(true);
-            }}
+        <SectionLabel label="PROFILE" />
+        <View style={[styles.card, { backgroundColor: C.surface, borderColor: C.border }]}>
+          <NavRow
+            label="Re-onboard"
+            desc="Reset your profile and preferences"
+            onPress={() => setResetModalVisible(true)}
+            danger
+            last
           />
         </View>
 
-        <SectionHeader title="PROFILE" />
-        <View style={styles.card}>
-          <RowItem
-            label="Re-onboard / Change preferences"
-            onPress={() => setResetModal(true)}
-          />
-        </View>
-
-        <SectionHeader title="ABOUT" />
-        <View style={styles.card}>
-          <RowItem label="App version" value="1.0.0" />
-          <Divider />
-          <RowItem label="Harold is powered by live Chicago data" />
-          <Divider />
-          <RowItem label="Built at DemonHacks 2026" />
+        <SectionLabel label="ABOUT" />
+        <View style={[styles.card, { backgroundColor: C.surface, borderColor: C.border }]}>
+          <InfoRow label="App version" value="1.0.0" />
+          <InfoRow label="Powered by" value="Live Chicago data" />
+          <InfoRow label="Built at" value="DemonHacks 2026" last />
         </View>
       </ScrollView>
 
-      <Modal transparent visible={resetModal} animationType="fade">
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Start over?</Text>
-            <Text style={styles.modalSub}>This will reset your profile and return you to the beginning.</Text>
+      <Modal
+        visible={resetModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setResetModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalBox, { backgroundColor: C.surface }]}>
+            <Text style={[styles.modalTitle, { color: C.textPrimary }]}>Start over?</Text>
+            <Text style={[styles.modalDesc, { color: C.textSecondary }]}>
+              This will reset your profile and preferences.
+            </Text>
             <View style={styles.modalBtns}>
-              <Pressable style={styles.modalCancel} onPress={() => setResetModal(false)}>
-                <Text style={styles.modalCancelText}>Cancel</Text>
+              <Pressable
+                onPress={() => setResetModalVisible(false)}
+                style={({ pressed }) => [styles.modalBtn, { backgroundColor: C.border, opacity: pressed ? 0.7 : 1 }]}
+              >
+                <Text style={[styles.modalBtnText, { color: C.textPrimary }]}>Cancel</Text>
               </Pressable>
-              <Pressable style={styles.modalDanger} onPress={handleReset}>
-                <Text style={styles.modalDangerText}>Reset</Text>
+              <Pressable
+                onPress={handleReset}
+                style={({ pressed }) => [styles.modalBtn, { backgroundColor: "#C8303A", opacity: pressed ? 0.7 : 1 }]}
+              >
+                <Text style={[styles.modalBtnText, { color: "#FFFFFF" }]}>Reset</Text>
               </Pressable>
             </View>
           </View>
         </View>
-      </Modal>
-
-      <Modal transparent visible={editContactModal} animationType="slide">
-        <Pressable style={styles.modalBackdrop} onPress={() => setEditContactModal(false)}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Emergency Contact</Text>
-            <View style={styles.inputWrapper}>
-              <TextInput
-                style={styles.input}
-                placeholder="Contact name"
-                placeholderTextColor={Colors.textTertiary}
-                value={contactName}
-                onChangeText={setContactName}
-                autoCapitalize="words"
-              />
-            </View>
-            <View style={styles.inputWrapper}>
-              <TextInput
-                style={styles.input}
-                placeholder="Phone number"
-                placeholderTextColor={Colors.textTertiary}
-                value={contactPhone}
-                onChangeText={setContactPhone}
-                keyboardType="phone-pad"
-              />
-            </View>
-            <View style={styles.modalBtns}>
-              <Pressable style={styles.modalCancel} onPress={() => setEditContactModal(false)}>
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </Pressable>
-              <Pressable style={[styles.modalCancel, { backgroundColor: Colors.accent, borderColor: Colors.accent }]} onPress={saveContact}>
-                <Text style={[styles.modalCancelText, { color: "#FFFFFF" }]}>Save</Text>
-              </Pressable>
-            </View>
-          </View>
-        </Pressable>
       </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.background },
+  root: { flex: 1 },
   header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: Colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1,
   },
-  backBtn: { width: 36, height: 36, alignItems: "center", justifyContent: "center" },
-  headerTitle: { fontSize: 17, fontWeight: "700", color: Colors.textPrimary },
-
+  backBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
+  headerTitle: { fontSize: 17, fontWeight: "700" },
   scroll: { flex: 1 },
-  content: { paddingHorizontal: 16, paddingTop: 24, gap: 0 },
-
-  sectionHeader: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: Colors.textTertiary,
-    letterSpacing: 0.8,
-    marginBottom: 8,
-    marginTop: 20,
-    paddingHorizontal: 4,
-  },
-  card: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    overflow: "hidden",
-  },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    gap: 10,
-  },
-  rowLabel: { flex: 1, fontSize: 15, color: Colors.textPrimary },
-  rowLabelDanger: { color: Colors.danger },
-  rowValue: { fontSize: 15, color: Colors.textTertiary },
-  divider: { height: 1, backgroundColor: Colors.border, marginHorizontal: 16 },
-
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 24,
-  },
-  modalCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 20,
-    padding: 24,
-    width: "100%",
-    gap: 12,
-  },
-  modalTitle: { fontSize: 17, fontWeight: "700", color: Colors.textPrimary },
-  modalSub: { fontSize: 14, color: Colors.textSecondary, lineHeight: 20 },
-  modalBtns: { flexDirection: "row", gap: 10, marginTop: 4 },
-  modalCancel: {
-    flex: 1,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-  modalCancelText: { fontSize: 15, color: Colors.textSecondary },
-  modalDanger: {
-    flex: 1,
-    backgroundColor: Colors.danger,
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-  modalDangerText: { fontSize: 15, fontWeight: "600", color: "#FFFFFF" },
-
-  inputWrapper: {
-    backgroundColor: Colors.background,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    overflow: "hidden",
-  },
-  input: {
-    fontSize: 15,
-    color: Colors.textPrimary,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
+  content: { paddingHorizontal: 16, paddingTop: 8 },
+  sectionLabel: { fontSize: 11, fontWeight: "700", letterSpacing: 1, marginTop: 20, marginBottom: 8, paddingHorizontal: 4 },
+  card: { borderRadius: 16, borderWidth: 1.5, overflow: "hidden" },
+  row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 14 },
+  rowText: { flex: 1, gap: 2, paddingRight: 12 },
+  rowLabel: { fontSize: 15, fontWeight: "500" },
+  rowDesc: { fontSize: 12, lineHeight: 17 },
+  rowValue: { fontSize: 14 },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "center", alignItems: "center", padding: 32 },
+  modalBox: { borderRadius: 20, padding: 24, width: "100%", gap: 12 },
+  modalTitle: { fontSize: 18, fontWeight: "700" },
+  modalDesc: { fontSize: 14, lineHeight: 20 },
+  modalBtns: { flexDirection: "row", gap: 10, marginTop: 8 },
+  modalBtn: { flex: 1, borderRadius: 12, paddingVertical: 13, alignItems: "center" },
+  modalBtnText: { fontSize: 15, fontWeight: "600" },
 });

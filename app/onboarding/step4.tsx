@@ -2,7 +2,6 @@ import React, { useState, useRef } from "react";
 import {
   View,
   Text,
-  TextInput,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -30,21 +29,8 @@ export default function OnboardingStep4() {
   const { saveProfile } = useProfile();
 
   const [safetyAlerts, setSafetyAlerts] = useState(false);
-  const [emergencyEnabled, setEmergencyEnabled] = useState(false);
-  const [emergencyName, setEmergencyName] = useState("");
-  const [emergencyPhone, setEmergencyPhone] = useState("");
   const [trainAlerts, setTrainAlerts] = useState(false);
   const ctaScale = useRef(new Animated.Value(1)).current;
-  const expandAnim = useRef(new Animated.Value(0)).current;
-
-  const toggleEmergency = (val: boolean) => {
-    setEmergencyEnabled(val);
-    Animated.timing(expandAnim, {
-      toValue: val ? 1 : 0,
-      duration: 250,
-      useNativeDriver: false,
-    }).start();
-  };
 
   const handleComplete = async () => {
     Animated.sequence([
@@ -53,32 +39,22 @@ export default function OnboardingStep4() {
     ]).start();
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-    const emergencyContact =
-      emergencyEnabled && emergencyName
-        ? { name: emergencyName, phone: emergencyPhone }
-        : null;
-
     await saveProfile({
       name: params.name ?? "",
       personas: params.personas ? params.personas.split(",").filter(Boolean) : [],
       university: params.university ?? "",
       sportsNotifications: params.sportsNotifications === "true",
       interests: params.interests ? params.interests.split(",").filter(Boolean) : [],
-      homeZone: params.homeZone ?? "loop",
-      currentZone: params.homeZone ?? "loop",
+      homeZone: params.homeZone ?? "central",
+      currentZone: params.homeZone ?? "central",
       safetyAlerts,
-      emergencyContact,
+      emergencyContact: null,
       trainAlerts,
       onboardedAt: new Date().toISOString(),
     });
 
     router.replace("/(tabs)");
   };
-
-  const expandHeight = expandAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 130],
-  });
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
@@ -122,49 +98,6 @@ export default function OnboardingStep4() {
 
           <View style={styles.toggleRow}>
             <View style={styles.toggleText}>
-              <Text style={styles.toggleLabel}>Emergency contact</Text>
-              <Text style={styles.toggleDesc}>Harold can notify someone if you're near danger</Text>
-            </View>
-            <Switch
-              value={emergencyEnabled}
-              onValueChange={toggleEmergency}
-              trackColor={{ false: Colors.border, true: Colors.danger }}
-              thumbColor="#FFFFFF"
-            />
-          </View>
-
-          <Animated.View style={[styles.expandSection, { height: expandHeight, overflow: "hidden" }]}>
-            <View style={styles.expandInner}>
-              <View style={styles.inputWrapper}>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Contact name"
-                  placeholderTextColor={Colors.textTertiary}
-                  value={emergencyName}
-                  onChangeText={setEmergencyName}
-                  autoCapitalize="words"
-                />
-              </View>
-              <View style={styles.inputWrapper}>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Phone number"
-                  placeholderTextColor={Colors.textTertiary}
-                  value={emergencyPhone}
-                  onChangeText={setEmergencyPhone}
-                  keyboardType="phone-pad"
-                />
-              </View>
-              <Text style={styles.expandHelp}>
-                They'll get a text if you trigger an emergency alert.
-              </Text>
-            </View>
-          </Animated.View>
-
-          <View style={styles.divider} />
-
-          <View style={styles.toggleRow}>
-            <View style={styles.toggleText}>
               <Text style={styles.toggleLabel}>Train alerts</Text>
               <Text style={styles.toggleDesc}>Subtle nudge when your train is arriving nearby</Text>
             </View>
@@ -179,9 +112,9 @@ export default function OnboardingStep4() {
       </ScrollView>
 
       <View style={[styles.ctaWrapper, { paddingBottom: bottomPad + 16 }]}>
-        <Pressable onPress={handleComplete}>
+        <Pressable onPress={handleComplete} style={{ width: "100%" }}>
           <Animated.View style={[styles.ctaButton, { transform: [{ scale: ctaScale }] }]}>
-            <Text style={styles.ctaText}>Enter Chicago →</Text>
+            <Text style={styles.ctaText}>Complete Setup</Text>
           </Animated.View>
         </Pressable>
       </View>
@@ -200,58 +133,23 @@ const styles = StyleSheet.create({
   heading: { fontSize: 34, fontWeight: "700", color: Colors.textPrimary, letterSpacing: -0.8, lineHeight: 40, marginBottom: 8 },
   subtitle: { fontSize: 16, color: Colors.textSecondary, lineHeight: 24, marginBottom: 28 },
   togglesCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    overflow: "hidden",
+    backgroundColor: Colors.surface, borderRadius: 16,
+    borderWidth: 1.5, borderColor: Colors.border, overflow: "hidden",
   },
-  toggleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    gap: 12,
-  },
+  toggleRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 16, gap: 12 },
   toggleText: { flex: 1, gap: 3 },
   toggleLabel: { fontSize: 15, fontWeight: "600", color: Colors.textPrimary },
   toggleDesc: { fontSize: 12, color: Colors.textTertiary, lineHeight: 17 },
-  divider: { height: 1, backgroundColor: Colors.border, marginHorizontal: 0 },
-  expandSection: {},
-  expandInner: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 16,
-    gap: 8,
-    backgroundColor: "#FAFAF8",
-  },
-  inputWrapper: {
-    backgroundColor: Colors.surface,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    overflow: "hidden",
-  },
-  input: {
-    fontSize: 15,
-    color: Colors.textPrimary,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-  },
-  expandHelp: { fontSize: 11, color: Colors.textTertiary, lineHeight: 16 },
+  divider: { height: 1, backgroundColor: Colors.border },
   ctaWrapper: {
-    position: "absolute",
-    bottom: 0, left: 0, right: 0,
+    position: "absolute", bottom: 0, left: 0, right: 0,
     paddingHorizontal: 24, paddingTop: 16,
     backgroundColor: Colors.background,
     borderTopWidth: 1, borderTopColor: Colors.border,
   },
   ctaButton: {
-    backgroundColor: Colors.accent,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 16,
+    width: "100%", backgroundColor: Colors.accent, borderRadius: 14,
+    alignItems: "center", justifyContent: "center", paddingVertical: 16,
   },
-  ctaText: { fontSize: 16, fontWeight: "600", color: "#FFFFFF" },
+  ctaText: { fontSize: 15, fontWeight: "600", color: "#FFFFFF" },
 });

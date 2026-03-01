@@ -28,10 +28,7 @@ function ProgressBar({ step, total }: { step: number; total: number }) {
       {Array.from({ length: total }).map((_, i) => (
         <View
           key={i}
-          style={[
-            styles.progressSegment,
-            i < step && styles.progressSegmentFilled,
-          ]}
+          style={[styles.progressSegment, i < step && styles.progressSegmentFilled]}
         />
       ))}
     </View>
@@ -95,11 +92,11 @@ export default function OnboardingStep1() {
           <Text style={styles.logoText}>Chicago Pulse</Text>
         </View>
 
-        <Text style={styles.heading}>Who are you{"\n"}in Chicago?</Text>
-        <Text style={styles.subtitle}>Helps Harold know what matters to you.</Text>
+        <Text style={styles.heading}>Get Started</Text>
+        <Text style={styles.subtitle}>Help us tailor your Chicago experience.</Text>
 
         <View style={styles.section}>
-          <Text style={styles.fieldLabel}>What should Harold call you?</Text>
+          <Text style={styles.fieldLabel}>Introduce Yourself.</Text>
           <View style={styles.inputWrapper}>
             <TextInput
               style={styles.input}
@@ -116,7 +113,7 @@ export default function OnboardingStep1() {
         <View style={styles.section}>
           <View style={styles.fieldLabelRow}>
             <Text style={styles.fieldLabel}>I am a...</Text>
-            <Text style={styles.helperText}>Select up to 2</Text>
+            <Text style={styles.helperText}>Students select up to 2</Text>
           </View>
           <View style={styles.pillRow}>
             {PERSONAS.map((p) => {
@@ -153,12 +150,10 @@ export default function OnboardingStep1() {
       </ScrollView>
 
       <View style={[styles.ctaWrapper, { paddingBottom: bottomPad + 16 }]}>
-        <Pressable onPress={handleContinue}>
-          <Animated.View
-            style={[styles.ctaButton, { transform: [{ scale: ctaScale }] }]}
-          >
+        <Pressable onPress={handleContinue} style={{ width: "100%" }}>
+          <Animated.View style={[styles.ctaButton, { transform: [{ scale: ctaScale }] }]}>
             <Text style={styles.ctaText}>Continue</Text>
-            <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+            <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
           </Animated.View>
         </Pressable>
         <Pressable onPress={handleSkip} style={styles.skipBtn}>
@@ -171,141 +166,42 @@ export default function OnboardingStep1() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.background },
-  progressBar: {
-    flexDirection: "row",
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 8,
-    gap: 6,
-  },
-  progressSegment: {
-    flex: 1,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: Colors.border,
-  },
-  progressSegmentFilled: {
-    backgroundColor: Colors.accent,
-  },
+  progressBar: { flexDirection: "row", paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8, gap: 6 },
+  progressSegment: { flex: 1, height: 4, borderRadius: 2, backgroundColor: Colors.border },
+  progressSegmentFilled: { backgroundColor: Colors.accent },
   scroll: { flex: 1 },
   content: { paddingHorizontal: 24, paddingTop: 16 },
-  logoRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 28,
-  },
-  logoIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: "#FEF0ED",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  logoText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: Colors.textPrimary,
-    letterSpacing: -0.3,
-  },
-  heading: {
-    fontSize: 34,
-    fontWeight: "700",
-    color: Colors.textPrimary,
-    letterSpacing: -0.8,
-    lineHeight: 40,
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: Colors.textSecondary,
-    lineHeight: 24,
-    marginBottom: 36,
-  },
+  logoRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 28 },
+  logoIcon: { width: 32, height: 32, borderRadius: 8, backgroundColor: "#FEF0ED", alignItems: "center", justifyContent: "center" },
+  logoText: { fontSize: 15, fontWeight: "600", color: Colors.textPrimary, letterSpacing: -0.3 },
+  heading: { fontSize: 34, fontWeight: "700", color: Colors.textPrimary, letterSpacing: -0.8, lineHeight: 40, marginBottom: 8 },
+  subtitle: { fontSize: 16, color: Colors.textSecondary, lineHeight: 24, marginBottom: 36 },
   section: { marginBottom: 32 },
-  fieldLabelRow: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    justifyContent: "space-between",
-    marginBottom: 12,
-  },
-  fieldLabel: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: Colors.textPrimary,
-    marginBottom: 12,
-  },
-  helperText: {
-    fontSize: 12,
-    color: Colors.textTertiary,
-  },
-  inputWrapper: {
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    overflow: "hidden",
-  },
-  input: {
-    fontSize: 16,
-    color: Colors.textPrimary,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
+  fieldLabelRow: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 },
+  fieldLabel: { fontSize: 15, fontWeight: "600", color: Colors.textPrimary, marginBottom: 12 },
+  helperText: { fontSize: 12, color: Colors.textTertiary },
+  inputWrapper: { backgroundColor: Colors.surface, borderRadius: 12, borderWidth: 1.5, borderColor: Colors.border, overflow: "hidden" },
+  input: { fontSize: 16, color: Colors.textPrimary, paddingHorizontal: 16, paddingVertical: 14 },
   pillRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  pill: {
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 24,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    backgroundColor: Colors.surface,
-  },
-  pillSelected: {
-    borderColor: Colors.accent,
-    backgroundColor: "#FEF0ED",
-  },
+  pill: { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 24, borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.surface },
+  pillSelected: { borderColor: Colors.accent, backgroundColor: "#FEF0ED" },
   pillDisabled: { opacity: 0.4 },
-  pillText: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: Colors.textSecondary,
-  },
+  pillText: { fontSize: 14, fontWeight: "500", color: Colors.textSecondary },
   pillTextSelected: { color: Colors.accent, fontWeight: "600" },
   pillTextDisabled: { color: Colors.textTertiary },
   ctaWrapper: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 24,
-    paddingTop: 16,
+    position: "absolute", bottom: 0, left: 0, right: 0,
+    paddingHorizontal: 24, paddingTop: 16,
     backgroundColor: Colors.background,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-    gap: 12,
-    alignItems: "center",
+    borderTopWidth: 1, borderTopColor: Colors.border,
+    gap: 12, alignItems: "center",
   },
   ctaButton: {
-    width: "100%",
-    backgroundColor: Colors.textPrimary,
-    borderRadius: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 16,
-    alignSelf: "stretch",
+    width: "100%", backgroundColor: Colors.textPrimary, borderRadius: 14,
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 8, paddingVertical: 15,
   },
-  ctaText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#FFFFFF",
-  },
+  ctaText: { fontSize: 15, fontWeight: "600", color: "#FFFFFF" },
   skipBtn: { paddingVertical: 4 },
-  skipText: {
-    fontSize: 14,
-    color: Colors.textTertiary,
-  },
+  skipText: { fontSize: 14, color: Colors.textTertiary },
 });

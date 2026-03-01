@@ -8,6 +8,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { queryClient } from "@/lib/query-client";
 import { ProfileProvider } from "@/context/profile";
 import { ThemeProvider } from "@/context/theme";
+import { SavedProvider } from "@/context/saved";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -37,11 +38,13 @@ export default function RootLayout() {
       <QueryClientProvider client={queryClient}>
         <ProfileProvider>
           <ThemeProvider>
-            <GestureHandlerRootView style={{ flex: 1 }}>
-              <KeyboardProvider>
-                <RootLayoutNav />
-              </KeyboardProvider>
-            </GestureHandlerRootView>
+            <SavedProvider>
+              <GestureHandlerRootView style={{ flex: 1 }}>
+                <KeyboardProvider>
+                  <RootLayoutNav />
+                </KeyboardProvider>
+              </GestureHandlerRootView>
+            </SavedProvider>
           </ThemeProvider>
         </ProfileProvider>
       </QueryClientProvider>

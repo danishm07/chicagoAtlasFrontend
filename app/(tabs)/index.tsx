@@ -14,23 +14,12 @@ import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import Colors from "@/constants/colors";
 import { useProfile } from "@/context/profile";
-import { router } from "expo-router";
+import { useColors } from "@/context/theme";
+import { useSaved } from "@/context/saved";
 import { FLAGS, BACKEND_URL } from "@/constants/config";
-
-const ZONE_LABELS: Record<string, string> = {
-  north_side: "North Side",
-  near_campus: "Near Campus",
-  loop: "The Loop",
-  south_side: "South Side",
-  west_side: "West Side",
-  gps: "My Location",
-  north: "North Loop",
-  depaul_loop: "DePaul Loop",
-  west: "West Loop",
-  south: "South Loop",
-};
+import SharedHeader from "@/components/SharedHeader";
+import SavedPanel from "@/components/SavedPanel";
 
 type Message = {
   id: string;
@@ -91,463 +80,279 @@ function getMockResponse(input: string): { text: string; sources: string[] } {
 }
 
 const QUICK_PROMPTS_BY_PERSONA: Record<string, string[]> = {
-  student: [
-    "What's happening near campus?",
-    "Cheapest food open right now?",
-    "Is it safe to walk tonight?",
-    "Any free events today?",
-  ],
-  commuter: [
-    "How's my commute looking?",
-    "Any CTA delays right now?",
-    "Quick lunch near me under $15?",
-    "Is the Loop busy right now?",
-  ],
-  local: [
-    "What's actually worth doing tonight?",
-    "Any hidden gems open right now?",
-    "What's trending in my neighborhood?",
-    "Best bar with no wait right now?",
-  ],
-  visitor: [
-    "What should I do in Chicago today?",
-    "What's uniquely Chicago right now?",
-    "Is it safe to explore tonight?",
-    "Best neighborhood to walk around?",
-  ],
+  student: ["What's happening near campus?", "Cheapest food open right now?", "Is it safe to walk tonight?", "Any free events today?"],
+  commuter: ["CTA delays right now?", "Fastest route to the Loop?", "Is the Red Line running?", "Parking near downtown?"],
+  local: ["What's buzzing tonight?", "Any crowd spikes nearby?", "Best new spots this week?", "Neighborhood safety update?"],
+  visitor: ["Best things to do today?", "Chicago must-eats near me?", "Is Millennium Park busy?", "How do I use the CTA?"],
+  default: ["What's happening tonight?", "Is it safe to walk?", "Best food nearby?", "CTA status?"],
 };
 
-const DEFAULT_PROMPTS = [
-  "What's happening tonight?",
-  "Is it safe to walk right now?",
-  "Best coffee nearby?",
-  "How's the CTA running?",
-];
+function genId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
 
-function TypingIndicator() {
-  const dot1 = useRef(new Animated.Value(0)).current;
-  const dot2 = useRef(new Animated.Value(0)).current;
-  const dot3 = useRef(new Animated.Value(0)).current;
+function SourceChip({ label }: { label: string }) {
+  const C = useColors();
+  return (
+    <View style={[styles.sourceChip, { backgroundColor: C.surface, borderColor: C.border }]}>
+      <Text style={[styles.sourceChipText, { color: C.textSecondary }]}>{label}</Text>
+    </View>
+  );
+}
+
+function TypingDots() {
+  const dot1 = useRef(new Animated.Value(0.3)).current;
+  const dot2 = useRef(new Animated.Value(0.3)).current;
+  const dot3 = useRef(new Animated.Value(0.3)).current;
+  const C = useColors();
 
   useEffect(() => {
-    const pulse = (dot: Animated.Value, delay: number) =>
+    const anim = (d: Animated.Value, delay: number) =>
       Animated.loop(
         Animated.sequence([
           Animated.delay(delay),
-          Animated.timing(dot, { toValue: 1, duration: 300, useNativeDriver: true }),
-          Animated.timing(dot, { toValue: 0, duration: 300, useNativeDriver: true }),
-          Animated.delay(600),
+          Animated.timing(d, { toValue: 1, duration: 300, useNativeDriver: true }),
+          Animated.timing(d, { toValue: 0.3, duration: 300, useNativeDriver: true }),
         ])
       );
-    const a1 = pulse(dot1, 0);
-    const a2 = pulse(dot2, 200);
-    const a3 = pulse(dot3, 400);
+    const a1 = anim(dot1, 0);
+    const a2 = anim(dot2, 150);
+    const a3 = anim(dot3, 300);
     a1.start(); a2.start(); a3.start();
     return () => { a1.stop(); a2.stop(); a3.stop(); };
   }, []);
 
   return (
-    <View style={styles.aiBubbleRow}>
-      <View style={styles.aiBubble}>
-        <View style={styles.typingDots}>
-          {[dot1, dot2, dot3].map((dot, i) => (
-            <Animated.View
-              key={i}
-              style={[
-                styles.typingDot,
-                {
-                  opacity: dot.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }),
-                  transform: [{ translateY: dot.interpolate({ inputRange: [0, 1], outputRange: [0, -4] }) }],
-                },
-              ]}
-            />
-          ))}
-        </View>
+    <View style={[styles.aiBubble, { backgroundColor: C.surface }]}>
+      <View style={{ flexDirection: "row", gap: 5, paddingVertical: 4 }}>
+        {[dot1, dot2, dot3].map((d, i) => (
+          <Animated.View key={i} style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: C.textTertiary, opacity: d }} />
+        ))}
       </View>
     </View>
   );
 }
 
-function LiveDot() {
-  const scale = useRef(new Animated.Value(1)).current;
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(scale, { toValue: 1.6, duration: 700, useNativeDriver: true }),
-        Animated.timing(scale, { toValue: 1, duration: 700, useNativeDriver: true }),
-      ])
-    ).start();
-  }, []);
-  return (
-    <View style={styles.liveDotWrapper}>
-      <Animated.View style={[styles.liveDotRing, { transform: [{ scale }] }]} />
-      <View style={styles.liveDot} />
-    </View>
-  );
-}
-
-function MessageBubble({ msg }: { msg: Message }) {
-  const isUser = msg.role === "user";
-  const timeStr = msg.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  if (msg.role === "typing") return <TypingIndicator />;
-
-  return (
-    <View style={[styles.messageRow, isUser ? styles.messageRowUser : styles.messageRowAI]}>
-      {isUser ? (
-        <View style={styles.userBubble}>
-          <Text style={styles.userText}>{msg.text}</Text>
-          <Text style={[styles.timestamp, styles.timestampUser]}>{timeStr}</Text>
-        </View>
-      ) : (
-        <View style={styles.aiGroup}>
-          <View style={styles.aiBubble}>
-            <Text style={styles.aiText}>{msg.text}</Text>
-          </View>
-          {msg.sources && msg.sources.length > 0 && (
-            <View style={styles.sourcesRow}>
-              {msg.sources.map((src) => (
-                <View key={src} style={styles.sourceChip}>
-                  <Text style={styles.sourceChipText}>{src}</Text>
-                </View>
-              ))}
-            </View>
-          )}
-          <Text style={[styles.timestamp, styles.timestampAI]}>{timeStr}</Text>
-        </View>
-      )}
-    </View>
-  );
-}
-
-const makeId = () => Date.now().toString() + Math.random().toString(36).substr(2, 6);
-
-export default function AskScreen() {
+export default function AskTab() {
   const insets = useSafeAreaInsets();
   const { profile } = useProfile();
-  const [input, setInput] = useState("");
-  const [isSending, setIsSending] = useState(false);
-  const inputRef = useRef<TextInput>(null);
+  const C = useColors();
+  const { panelOpen, closePanel } = useSaved();
 
-  const topPad = Platform.OS === "web" ? 67 : insets.top;
+  const firstName = profile?.name?.split(" ")[0] ?? "there";
+  const personas = profile?.personas ?? [];
+  const primaryPersona = personas[0] ?? "default";
+  const quickPrompts = QUICK_PROMPTS_BY_PERSONA[primaryPersona] ?? QUICK_PROMPTS_BY_PERSONA.default;
+
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [inputText, setInputText] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
+  const [hasStarted, setHasStarted] = useState(false);
+
+  const greetingOpacity = useRef(new Animated.Value(1)).current;
+  const greetingY = useRef(new Animated.Value(0)).current;
+  const chipsOpacity = useRef(new Animated.Value(1)).current;
+  const chipsY = useRef(new Animated.Value(0)).current;
+
   const bottomPad = Platform.OS === "web" ? 84 : insets.bottom + 80;
 
-  const displayName = profile?.name || "there";
-  const zone = ZONE_LABELS[profile?.homeZone ?? ""] ?? "Chicago";
-  const firstPersona = profile?.personas?.[0] ?? "visitor";
-  const persona = firstPersona.charAt(0).toUpperCase() + firstPersona.slice(1);
-
-  const quickPrompts = QUICK_PROMPTS_BY_PERSONA[firstPersona] ?? DEFAULT_PROMPTS;
-
-  const openingMessage: Message = {
-    id: "opening",
-    role: "ai",
-    text: `Hey ${displayName} 👋\nI'm plugged into live Chicago data right now — what do you want to know?`,
-    sources: ["Chicago 311", "Yelp", "CTA", "Weather"],
-    timestamp: new Date(Date.now() - 180000),
-  };
-
-  const [messages, setMessages] = useState<Message[]>([openingMessage]);
-  const messagesRef = useRef(messages);
-  useEffect(() => { messagesRef.current = messages; }, [messages]);
-
-  const handleSend = useCallback(
-    (text?: string) => {
-      const msg = (text ?? input).trim();
-      if (!msg || isSending) return;
-
+  const sendMessage = useCallback(
+    async (text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed) return;
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      setInput("");
-      setIsSending(true);
 
-      const userMsg: Message = { id: makeId(), role: "user", text: msg, timestamp: new Date() };
-      const typingMsg: Message = { id: "typing", role: "typing", text: "", timestamp: new Date() };
+      if (!hasStarted) {
+        setHasStarted(true);
+        Animated.parallel([
+          Animated.timing(greetingOpacity, { toValue: 0, duration: 280, useNativeDriver: true }),
+          Animated.timing(greetingY, { toValue: -40, duration: 300, useNativeDriver: true }),
+          Animated.timing(chipsOpacity, { toValue: 0, duration: 200, useNativeDriver: true }),
+          Animated.timing(chipsY, { toValue: 30, duration: 220, useNativeDriver: true }),
+        ]).start();
+      }
 
-      setMessages((prev) => [typingMsg, userMsg, ...prev]);
+      const userMsg: Message = { id: genId(), role: "user", text: trimmed, timestamp: new Date() };
+      setMessages((prev) => [userMsg, ...prev]);
+      setInputText("");
+      setIsTyping(true);
 
       if (FLAGS.USE_REAL_CHAT) {
-        const history = messagesRef.current.slice(0, 6).map((m) => ({
-          role: m.role === "ai" ? "assistant" : "user",
-          content: m.text,
-        }));
-        let fullText = "";
-        const aiMsgId = makeId();
-
-        (async () => {
-          try {
-            const response = await fetch(BACKEND_URL + "/api/chat", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ message: msg, history, profile }),
-            });
-            const reader = response.body!.getReader();
-            const decoder = new TextDecoder();
-
-            const streamingMsg: Message = {
-              id: aiMsgId,
-              role: "ai",
-              text: "",
-              sources: [],
-              timestamp: new Date(),
-            };
-            setMessages((prev) => [streamingMsg, ...prev.filter((m) => m.id !== "typing")]);
-
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              fullText += decoder.decode(value);
-              setMessages((prev) =>
-                prev.map((m) => m.id === aiMsgId ? { ...m, text: fullText } : m)
-              );
-            }
-
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === aiMsgId
-                  ? { ...m, text: fullText, sources: ["Chicago 311", "Yelp", "CTA"] }
-                  : m
-              )
-            );
-          } catch {
-            const errMsg: Message = {
-              id: makeId(),
-              role: "ai",
-              text: "I couldn't reach live data right now. Try again in a moment.",
-              sources: [],
-              timestamp: new Date(),
-            };
-            setMessages((prev) => [errMsg, ...prev.filter((m) => m.id !== "typing" && m.id !== aiMsgId)]);
-          } finally {
-            setIsSending(false);
-            inputRef.current?.focus();
-          }
-        })();
+        try {
+          const res = await fetch(`${BACKEND_URL}/api/chat`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: trimmed, profile }),
+          });
+          const data = await res.json();
+          setIsTyping(false);
+          const aiMsg: Message = { id: genId(), role: "ai", text: data.response ?? data.message, sources: data.sources ?? [], timestamp: new Date() };
+          setMessages((prev) => [aiMsg, ...prev]);
+        } catch {
+          setIsTyping(false);
+          const errMsg: Message = { id: genId(), role: "ai", text: "Couldn't reach Chicago data right now. Try again.", sources: [], timestamp: new Date() };
+          setMessages((prev) => [errMsg, ...prev]);
+        }
       } else {
-        setTimeout(() => {
-          const { text: responseText, sources } = getMockResponse(msg);
-          const aiMsg: Message = { id: makeId(), role: "ai", text: responseText, sources, timestamp: new Date() };
-          setMessages((prev) => [aiMsg, ...prev.filter((m) => m.id !== "typing")]);
-          setIsSending(false);
-          inputRef.current?.focus();
-        }, 1400);
+        await new Promise((r) => setTimeout(r, 900 + Math.random() * 700));
+        setIsTyping(false);
+        const { text: responseText, sources } = getMockResponse(trimmed);
+        const aiMsg: Message = { id: genId(), role: "ai", text: responseText, sources, timestamp: new Date() };
+        setMessages((prev) => [aiMsg, ...prev]);
       }
     },
-    [input, isSending, profile]
+    [hasStarted, profile]
   );
 
+  const renderMessage = ({ item }: { item: Message }) => {
+    if (item.role === "typing") return <TypingDots />;
+    if (item.role === "user") {
+      return (
+        <View style={styles.userRow}>
+          <View style={styles.userBubble}>
+            <Text style={styles.userBubbleText}>{item.text}</Text>
+          </View>
+        </View>
+      );
+    }
+    return (
+      <View style={styles.aiRow}>
+        <View style={[styles.aiBubble, { backgroundColor: C.surface }]}>
+          <Text style={[styles.aiBubbleText, { color: C.textPrimary }]}>{item.text}</Text>
+        </View>
+        {item.sources && item.sources.length > 0 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.sourceRow} contentContainerStyle={{ gap: 6, paddingHorizontal: 0 }}>
+            {item.sources.map((s) => <SourceChip key={s} label={s} />)}
+          </ScrollView>
+        )}
+      </View>
+    );
+  };
+
   return (
-    <KeyboardAvoidingView
-      style={[styles.root, { paddingTop: topPad }]}
-      behavior="padding"
-      keyboardVerticalOffset={0}
-    >
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <View style={styles.headerAvatar}>
-            <Text style={styles.headerAvatarText}>H</Text>
-          </View>
-          <View style={styles.headerCenter}>
-            <Text style={styles.headerTitle}>Harold</Text>
-            <View style={styles.headerStatusRow}>
-              <LiveDot />
-              <Text style={styles.headerStatus}>Connected to live Chicago data</Text>
-            </View>
-          </View>
-        </View>
-        <Pressable style={styles.settingsBtn} onPress={() => router.push("/settings")}>
-          <Ionicons name="settings-outline" size={22} color={Colors.textSecondary} />
-        </Pressable>
-      </View>
+    <View style={[styles.root, { backgroundColor: C.background }]}>
+      <SharedHeader />
 
-      <View style={styles.contextRow}>
-        <View style={styles.contextPill}>
-          <Text style={styles.contextText}>
-            📍 {zone} · {persona} · 4 sources active
-          </Text>
-        </View>
-      </View>
-
-      <FlatList
-        data={messages}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <MessageBubble msg={item} />}
-        inverted
-        contentContainerStyle={styles.messageList}
-        keyboardDismissMode="interactive"
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      />
-
-      <View style={styles.quickArea}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.quickScroll}
-          keyboardShouldPersistTaps="handled"
-        >
-          {quickPrompts.map((qp) => (
-            <Pressable
-              key={qp}
-              style={({ pressed }) => [
-                styles.quickChip,
-                { backgroundColor: pressed ? "#FEF0ED" : Colors.surface },
-              ]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                handleSend(qp);
-              }}
-            >
-              <Text style={styles.quickChipText}>{qp}</Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-      </View>
-
-      <View style={[styles.inputRow, { paddingBottom: bottomPad }]}>
-        <TextInput
-          ref={inputRef}
-          style={styles.textInput}
-          placeholder="Ask Harold anything..."
-          placeholderTextColor={Colors.textTertiary}
-          value={input}
-          onChangeText={setInput}
-          onSubmitEditing={() => handleSend()}
-          returnKeyType="send"
-          blurOnSubmit={false}
-          multiline={false}
-        />
-        <Pressable
-          style={({ pressed }) => [
-            styles.sendBtn,
-            {
-              backgroundColor:
-                input.trim().length > 0
-                  ? pressed
-                    ? Colors.accent
-                    : Colors.textPrimary
-                  : Colors.border,
-            },
-          ]}
-          onPress={() => handleSend()}
-          disabled={isSending}
-        >
-          <Ionicons
-            name="arrow-up"
-            size={18}
-            color={input.trim().length > 0 ? "#FFFFFF" : Colors.textTertiary}
+      <View style={styles.mainArea}>
+        {hasStarted && (
+          <FlatList
+            data={isTyping ? [{ id: "typing", role: "typing" as const, text: "", timestamp: new Date() }, ...messages] : messages}
+            inverted
+            keyExtractor={(item) => item.id}
+            renderItem={renderMessage}
+            contentContainerStyle={styles.messageList}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           />
-        </Pressable>
+        )}
+
+        <Animated.View
+          style={[
+            styles.greetingOverlay,
+            { opacity: greetingOpacity, transform: [{ translateY: greetingY }] },
+          ]}
+          pointerEvents={hasStarted ? "none" : "auto"}
+        >
+          <Text style={[styles.greetingName, { color: C.textPrimary }]}>
+            Hey {firstName}.
+          </Text>
+          <Text style={[styles.greetingSub, { color: C.textSecondary }]}>
+            Ask me anything about Chicago.
+          </Text>
+        </Animated.View>
       </View>
-    </KeyboardAvoidingView>
+
+      <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={0} style={{ backgroundColor: C.background }}>
+        <View style={[styles.inputBar, { backgroundColor: C.background, borderTopColor: C.border }]}>
+          <TextInput
+            style={[styles.input, { backgroundColor: C.surface, borderColor: C.border, color: C.textPrimary }]}
+            value={inputText}
+            onChangeText={setInputText}
+            placeholder="Ask about Chicago..."
+            placeholderTextColor={C.textTertiary}
+            multiline
+            maxLength={500}
+            returnKeyType="send"
+            onSubmitEditing={() => sendMessage(inputText)}
+          />
+          <Pressable
+            onPress={() => sendMessage(inputText)}
+            disabled={!inputText.trim()}
+            style={({ pressed }) => [
+              styles.sendBtn,
+              { backgroundColor: inputText.trim() ? (pressed ? "#E8533A" : "#1C1B18") : C.border },
+            ]}
+          >
+            <Ionicons name="arrow-up" size={18} color="#FFFFFF" />
+          </Pressable>
+        </View>
+
+        <Animated.View style={{ opacity: chipsOpacity, transform: [{ translateY: chipsY }], overflow: "hidden" }}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chipScroll}
+            style={{ paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 4 }}
+          >
+            {quickPrompts.map((prompt) => (
+              <Pressable
+                key={prompt}
+                onPress={() => sendMessage(prompt)}
+                style={({ pressed }) => [styles.quickChip, { backgroundColor: C.surface, borderColor: C.border, opacity: pressed ? 0.7 : 1 }]}
+              >
+                <Text style={[styles.quickChipText, { color: C.textSecondary }]}>{prompt}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </Animated.View>
+      </KeyboardAvoidingView>
+
+      <SavedPanel isOpen={panelOpen} onClose={closePanel} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.background },
-
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    backgroundColor: Colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    justifyContent: "space-between",
+  root: { flex: 1 },
+  mainArea: { flex: 1, position: "relative" },
+  greetingOverlay: {
+    position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+    justifyContent: "center", alignItems: "center",
+    paddingHorizontal: 32, paddingBottom: 40,
   },
-  headerLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
-  headerAvatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    backgroundColor: Colors.accent,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerAvatarText: { fontSize: 20, fontWeight: "700", color: "#FFFFFF" },
-  headerCenter: { gap: 2 },
-  headerTitle: { fontSize: 15, fontWeight: "700", color: Colors.textPrimary, letterSpacing: -0.2 },
-  headerStatusRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  liveDotWrapper: { width: 10, height: 10, alignItems: "center", justifyContent: "center" },
-  liveDotRing: {
-    position: "absolute",
-    width: 10, height: 10, borderRadius: 5,
-    backgroundColor: Colors.success, opacity: 0.35,
-  },
-  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.success },
-  headerStatus: { fontSize: 10, color: Colors.success },
-  settingsBtn: { padding: 6 },
-
-  contextRow: { paddingHorizontal: 16, paddingVertical: 8, alignItems: "center" },
-  contextPill: {
-    paddingHorizontal: 12, paddingVertical: 6,
-    backgroundColor: "#F0EEE9", borderRadius: 20,
-  },
-  contextText: { fontSize: 11, color: Colors.textTertiary },
-
-  messageList: { paddingHorizontal: 16, paddingVertical: 8, gap: 12 },
-  messageRow: { flexDirection: "row" },
-  messageRowUser: { justifyContent: "flex-end" },
-  messageRowAI: { justifyContent: "flex-start" },
-
+  greetingName: { fontSize: 36, fontWeight: "700", letterSpacing: -0.8, textAlign: "center", marginBottom: 8 },
+  greetingSub: { fontSize: 17, textAlign: "center", lineHeight: 24 },
+  messageList: { paddingHorizontal: 16, paddingVertical: 12, gap: 12 },
+  userRow: { alignItems: "flex-end" },
   userBubble: {
-    maxWidth: "78%",
-    backgroundColor: Colors.textPrimary,
-    borderRadius: 16, borderBottomRightRadius: 4,
-    padding: 14, gap: 4,
+    backgroundColor: "#1C1B18", borderRadius: 16, borderBottomRightRadius: 4,
+    paddingHorizontal: 14, paddingVertical: 10, maxWidth: "78%",
   },
-  userText: { fontSize: 14, color: "#FFFFFF", lineHeight: 20 },
-
-  aiGroup: { maxWidth: "82%", gap: 6 },
-  aiBubbleRow: { flexDirection: "row", justifyContent: "flex-start" },
+  userBubbleText: { color: "#FFFFFF", fontSize: 15, lineHeight: 22 },
+  aiRow: { alignItems: "flex-start", gap: 6 },
   aiBubble: {
-    backgroundColor: Colors.surface,
     borderRadius: 16, borderBottomLeftRadius: 4,
-    padding: 14,
-    borderWidth: 1, borderColor: Colors.border,
+    paddingHorizontal: 14, paddingVertical: 10, maxWidth: "85%",
+    shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4,
   },
-  aiText: { fontSize: 14, color: Colors.textPrimary, lineHeight: 22 },
-
-  sourcesRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  sourceChip: {
-    paddingHorizontal: 8, paddingVertical: 4,
-    backgroundColor: "#F0EEE9", borderRadius: 6,
+  aiBubbleText: { fontSize: 15, lineHeight: 22 },
+  sourceRow: { flexDirection: "row" },
+  sourceChip: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, borderWidth: 1 },
+  sourceChipText: { fontSize: 11, fontWeight: "500" },
+  inputBar: {
+    flexDirection: "row", alignItems: "flex-end", gap: 10,
+    paddingHorizontal: 16, paddingVertical: 10,
+    borderTopWidth: 1,
   },
-  sourceChipText: { fontSize: 10, color: Colors.textSecondary },
-
-  timestamp: { fontSize: 10, color: Colors.textTertiary },
-  timestampUser: { textAlign: "right" },
-  timestampAI: { textAlign: "left" },
-
-  typingDots: { flexDirection: "row", gap: 4, alignItems: "center", paddingHorizontal: 4, paddingVertical: 2 },
-  typingDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.textTertiary },
-
-  quickArea: {
-    borderTopWidth: 1, borderTopColor: Colors.border,
-    paddingVertical: 10, backgroundColor: Colors.background,
+  input: {
+    flex: 1, borderRadius: 20, borderWidth: 1.5,
+    paddingHorizontal: 16, paddingVertical: 10,
+    fontSize: 15, maxHeight: 120, lineHeight: 22,
   },
-  quickScroll: { paddingHorizontal: 16, gap: 8 },
+  sendBtn: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  chipScroll: { paddingHorizontal: 16, paddingVertical: 8, gap: 8 },
   quickChip: {
-    paddingHorizontal: 14, paddingVertical: 8,
-    borderRadius: 20, borderWidth: 1.5, borderColor: Colors.border,
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5,
   },
-  quickChipText: { fontSize: 13, color: Colors.textSecondary },
-
-  inputRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    gap: 10,
-    backgroundColor: Colors.surface,
-    borderTopWidth: 1, borderTopColor: Colors.border,
-  },
-  textInput: {
-    flex: 1, height: 44,
-    backgroundColor: Colors.background,
-    borderRadius: 22,
-    borderWidth: 1.5, borderColor: Colors.border,
-    paddingHorizontal: 16,
-    fontSize: 14, color: Colors.textPrimary,
-  },
-  sendBtn: { width: 42, height: 42, borderRadius: 21, alignItems: "center", justifyContent: "center" },
+  quickChipText: { fontSize: 13, fontWeight: "500" },
 });

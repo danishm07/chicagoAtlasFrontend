@@ -1,0 +1,73 @@
+Make ALL of the following changes to the Chicago Pulse app. Do not break existing functionality or design system unless told to. Work through each fix completely before moving to the next.
+
+---
+
+FIX 1 — ONBOARDING COPY + TEXT
+
+Page 1: "Who are you in Chicago?" → "Get Started" | "Helps Harold know what matters to you." → "Help us tailor your Chicago experience." | "What should Harold call you?" → "Introduce Yourself." | "Select up to 2" → "Students select up to 2" | Shrink "Continue →" button text so it fits naturally in the button — apply to ALL onboarding pages with a Continue button | Remove EVERY mention of "Harold" across all onboarding pages.
+
+Page 2: "Pick up to 3 — Harold will tailor what he shows you." → "Tailor your experience (Pick up to 3)"
+
+Page 3: Remove the "Near Campus — Lincoln Park / Loop area" zone option entirely. Remove helper text "Harold will surface what's closest to you." — keep only the "Where are you based?" heading. Replace all existing zone options with the 9 official Chicago sides as selectable cards, each with a distinct muted colored dot on the left: Far North Side, Northwest Side, North Side, West Side, Central, South Side, Southwest Side, Far Southwest Side, Far Southeast Side. Single select. Save to localStorage "loop_pulse_profile" as homeZone.
+
+Page 4: "Harold can notify someone if you're near danger" → "Notify someone if you're near danger" | "Enter Chicago" button → "Complete Setup"
+
+---
+
+FIX 2 — HIDE EMERGENCY CONTACT (DO NOT DELETE CODE)
+
+Keep ALL emergency contact code and localStorage logic (emergencyName, emergencyPhone keys) completely intact. Only remove it from every visible UI surface — onboarding, settings, everywhere. Nothing related to emergency contact should be visible to the user anywhere.
+
+---
+
+FIX 3 — UNIFIED HEADER (ALL 3 MAIN PAGES: Ask, Signals, Culture)
+
+Replace the header on all three main pages with this identical header:
+LEFT: No "Good evening," — remove it entirely. Large bold username from localStorage "loop_pulse_profile". Below name: tappable 📍 pill showing homeZone from localStorage (fallback: "Chicago") — tapping opens zone picker.
+RIGHT: Bookmark icon (opens Saved Places slide-over, FIX 7) + Gear icon (opens existing settings). REMOVE the green LIVE pill entirely from all pages.
+Match existing font sizes, colors, and padding exactly.
+
+---
+
+FIX 4 — ASK PAGE: CLAUDE-STYLE CHAT LAYOUT
+
+EMPTY STATE (before first message): Centered on screen — large bold "Hey [name]." + one-line subtitle "Ask me anything about Chicago." Below: large rounded multi-line input with send button. Below input: horizontal scroll quick prompt chips. Nothing else on screen.
+
+AFTER FIRST MESSAGE IS SENT: Greeting + subtitle animate UP and off screen. Quick prompt chips animate DOWN and off screen. Input box smoothly transitions to pinned bottom position (80px bottom padding to clear nav bar). Conversation messages fill remaining space above input, scrollable. This is a one-time transition per session — empty state never returns unless session is reset.
+
+INPUT (pinned): Rounded field, placeholder "Ask about Chicago...", circular send button (#1C1B18 bg, white arrow, turns coral #E8533A on hover), 80px bottom padding.
+USER messages: right-aligned, #1C1B18 bg, white text, 16px radius, 4px bottom-right corner.
+AI messages: left-aligned, white bg, subtle shadow, 16px radius, 4px bottom-left corner, source chips below.
+Keep all existing mock response logic. Chips just hide after first send.
+
+---
+
+FIX 5 — SIGNALS PAGE WIDGETS
+
+STYLING: Widget title → 16px bold. Description/info → 12px unbolded #7C7870. Add icon per type: Safety 🛡️, Transit 🚇, Air Quality 🌿, Weather ☀️, Events 🎟️, Crowd 👥. All blocks must be identical fixed size.
+
+INTERACTION: Show exactly 2 blocks side by side. Remove all horizontal scrolling. Press and hold a block to enter swap mode — a vertical slot machine slides up from the bottom of that block showing other available widget options. Flick up/down to cycle. Release to select and replace. Keep widget config in an extensible array so new types only require adding to that array.
+
+LIVE ALERTS: "Report to Chicago Pulse" → "Report to other Users" everywhere on this page.
+
+---
+
+FIX 6 — CULTURE PAGE
+
+"What's moving in Chicago right now" → "What's happening in Chicago?" | To the RIGHT of "Worth finding tonight" heading, add a small tappable cycling arrow button that cycles through exactly 3 hardcoded items (wraps after 3): 1) "Gyu-Kaku Loop — Japanese BBQ, limited seats" 2) "Chicago Cultural Center — free exhibit, open late" 3) "Second City — 8PM show, tickets available"
+
+SAVEABLE ITEMS: Add a bookmark icon to every food/venue/attraction item in the Culture page (especially Discover tab). Tapping saves to localStorage "loop_pulse_saved" as array of {id, name, category, type, meta}. Saved = filled bookmark, tap again to unsave. Do NOT add bookmarks to news or non-location content.
+
+---
+
+FIX 7 — SAVED PLACES SLIDE-OVER
+
+Slides in from the RIGHT when header bookmark is tapped. Available on all 3 main pages. Header: "Saved Places" (18px bold) + × close button. Body: list from localStorage "loop_pulse_saved" — each row has emoji/icon left, name + category center, filled bookmark unsave button right. Tapping unsave removes from localStorage and list in real time. Empty state: "Nothing saved yet. Explore the Culture tab to find places." centered in secondary color. Smooth slide-in animation, dimmed background overlay. Tapping outside or × closes it.
+
+---
+
+FIX 8 — SETTINGS
+
+DARK MODE (currently broken — fix it): ON state: background #1E1E1E, all text white/#F0EEE9, cards #2A2A2A, secondary text #A0A0A0. Apply globally across all pages. Save to localStorage "loop_pulse_darkmode" (boolean). Read and apply on app load.
+
+VIVID MODE (new toggle): Label "Vivid Mode", description "High contrast — easier to read for all users". When ON: invert color scheme (light bg → dark, dark text → light). Mutually exclusive with Dark Mode — turning one on turns the other off automatically. Save to localStorage "loop_pulse_vividmode" (boolean).
