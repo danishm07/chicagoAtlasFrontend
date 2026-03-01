@@ -45,7 +45,7 @@ export default function SavedPanel({ isOpen, onClose }: SavedPanelProps) {
   if (!mounted) return null;
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents={isOpen ? "auto" : "none"}>
+    <View style={[StyleSheet.absoluteFill, { pointerEvents: isOpen ? "auto" : "none" }]}>
       <Animated.View style={[styles.overlay, { opacity: overlayAnim }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
