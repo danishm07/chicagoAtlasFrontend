@@ -1,0 +1,142 @@
+Make the following fixes to the Loop Pulse app. Apply ALL of them. Do not break any existing functionality, styling, or design system. Work through each fix one by one.
+
+---
+
+FIX 1 — Chat Input Hidden Behind Bottom Nav
+In the Chat screen (app/chat/page.tsx), the chat input bar and quick prompt chips are being hidden behind the bottom navigation bar (72px tall). Fix this WITHOUT touching the bottom nav component.
+- Add paddingBottom of at least 80px to the chat layout container so the input and quick chips always sit visibly above the bottom nav bar
+- This should apply both when the keyboard is closed AND open
+- The quick prompt chips and the text input must BOTH be fully visible without tapping anything
+- Do NOT move or change the bottom nav bar itself
+- Do NOT remove the quick prompt chips
+- Test that nothing is clipped or overlapping at the bottom
+
+---
+
+FIX 2 — Fix Onboarding "I am a..." Section
+In the onboarding flow (app/onboard/page.tsx), make the following changes to the "I am a..." section ONLY. Do not touch any other part of the onboarding flow.
+1. Rename "Student" pill to "University Student"
+2. Enforce these mutual exclusivity rules:
+   - "Visitor" is always SOLO — selecting it deselects everything else, and no other option can be added while Visitor is selected
+   - "Commuter" and "Local Resident" cannot be selected together — selecting one deselects the other
+   - "University Student" and "Visitor" cannot be selected together — selecting one deselects the other
+   - All other combos (e.g. University Student + Commuter, University Student + Local Resident) are valid
+3. The max 2 selections rule stays in place
+4. Update the saved profile in localStorage key "loop_pulse_profile" to reflect the renamed value: save "University Student" not "Student"
+
+---
+
+FIX 3 — Remove "What Are You Into?" Section from Onboarding
+In the onboarding flow (app/onboard/page.tsx), completely remove the "What are you into?" section.
+- Delete the entire section including its label, helper text, and all pill buttons (Food & Drinks, Events & Shows, Safety & Navigation, Sports, Local Gems, Nightlife)
+- Remove the "interests" field from the localStorage profile object entirely
+- Do NOT touch any other section of the onboarding flow
+- Make sure the layout reflows cleanly after removal with no empty gaps or broken spacing
+
+---
+
+FIX 4 — Add Notification Preferences to Onboarding
+In the onboarding flow (app/onboard/page.tsx), add a notification preferences section to the existing Step 2 (the "One more thing." screen, below the zone picker). Do not create a new step.
+Add a section titled "Notifications" with subtitle: "Choose what you want to be alerted about."
+Two toggle rows, each with a label, short description, and an on/off toggle switch (default ON):
+
+Toggle 1:
+  Label: "Safety Alerts"
+  Description: "Incidents, blocked streets, emergencies"
+  Default: ON
+
+Toggle 2:
+  Label: "Sports & Events"
+  Description: "Game starts, show doors, event reminders"
+  Default: ON
+
+Styling:
+- White card container, 16px radius, same shadow as other cards on this screen
+- Toggle uses shadcn switch component
+- Coral (#E8533A) color when ON, #E8E5DF when OFF
+- Save both preferences to localStorage under "loop_pulse_profile" as:
+  { notifySafety: boolean, notifyEvents: boolean }
+
+---
+
+FIX 5 — Add Emergency Contact to Onboarding
+In the onboarding flow (app/onboard/page.tsx), add an emergency contact section to Step 1 (the "Welcome to Loop." screen), placed below the "I am a..." section. Do not create a new step.
+
+Section label: "Emergency Contact"
+Subtitle: "Optional — stored only on your device."
+
+Two input fields:
+  Field 1: placeholder "Contact name (e.g. Mom, Dad)"
+  Field 2: placeholder "Phone number" — use tel input type
+
+Styling:
+- Same input style as the "What should we call you?" field
+- Both fields are fully optional — do NOT block the Continue button if left empty
+- Small helper text below both fields: "Only used if you choose to share your location in an emergency. Never sent anywhere."
+- Save to localStorage under "loop_pulse_profile" as:
+  { emergencyName: string, emergencyPhone: string }
+
+---
+
+FIX 6 — Fix Alert Banner (Two Types + Dynamic Island)
+In the Home screen (app/home/page.tsx), fix the in-app alert banner. Do not change any other part of the home screen.
+
+TWO TYPES OF ALERTS — style them differently:
+
+Type 1 — SAFETY (incidents, fire, blocked streets):
+  Background: #C8303A (dark red)
+  Text: white
+  Left icon: ⚠️
+
+Type 2 — EVENT/SPORTS (game starting, show reminder):
+  Background: #1C1B18 (dark charcoal/black)
+  Text: white
+  Left icon: 🏀 for sports, 🎟️ for events
+
+Both types:
+- Right side: × dismiss button (white)
+- Auto-dismiss after 8 seconds
+- One banner at a time
+
+DYNAMIC ISLAND FIX:
+- The banner must drop down from the very top of the screen but start BELOW the dynamic island/notch area
+- Add a top offset of at least 54px before the banner starts so it is never hidden behind the dynamic island
+- Banner should animate sliding DOWN into view, not appearing at the very top edge
+
+UPDATE MOCK BANNERS:
+- Change the existing demo banner to use the EVENT type (charcoal #1C1B18 background) since "DePaul vs Marquette starts in 60 min →" is not a safety alert
+- Add a second mock safety banner that can be triggered separately to demonstrate the red type
+
+---
+
+FIX 7 — Fix Settings Panel
+In the Settings slide-over panel (components/SettingsSlideOver.tsx or wherever settings is currently built), make these two changes ONLY. Do not touch anything else.
+
+Change 1 — Rename button:
+  Find the button currently labeled "Restart Onboarding" and rename it to "Reset Account"
+  Keep the same styling, position, and functionality
+
+Change 2 — Add Notifications toggle section:
+  Add a section titled "Notifications" above the Reset Account button.
+  
+  Two toggle rows:
+  
+  Toggle 1:
+    Label: "Safety Alerts"
+    Description: "Incidents, blocked streets, emergencies"
+  
+  Toggle 2:
+    Label: "Sports & Events"
+    Description: "Game starts, show doors, event reminders"
+  
+  - Both toggles read their initial state FROM localStorage "loop_pulse_profile" keys notifySafety and notifyEvents
+  - Toggling them updates localStorage in real time
+  - Coral (#E8533A) when ON, #E8E5DF when OFF
+  - Use shadcn switch component
+
+---
+
+ALSO FIX THESE BUGS WHILE YOU'RE AT IT:
+- In the Chat screen (app/chat/page.tsx), the source chip that reads "CIA Alerts" is a typo — rename it to "CTA Alerts" everywhere it appears
+- In the Chat screen context pill, and everywhere in the app the zone is displayed, make sure it reads the zone from localStorage "loop_pulse_profile" and displays it correctly. The demo default should show "DePaul Loop" not "North"
+- In the Active Alerts section on the Home screen, stagger the timestamps so they are not all "Just now" — use "Just now", "2 min ago", and "5 min ago" respectively

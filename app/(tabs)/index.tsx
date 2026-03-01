@@ -9,6 +9,7 @@ import {
   Animated,
   Dimensions,
   Modal,
+  Switch,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, Feather, MaterialIcons } from "@expo/vector-icons";
@@ -88,12 +89,16 @@ function Shimmer({ width, height, radius = 6 }: { width: number | string; height
 // ─── Alert Banner ─────────────────────────────────────────────────────────────
 function AlertBanner({
   message,
+  type,
+  icon,
   onDismiss,
 }: {
   message: string;
+  type: "safety" | "event";
+  icon: string;
   onDismiss: () => void;
 }) {
-  const translateY = useRef(new Animated.Value(-80)).current;
+  const translateY = useRef(new Animated.Value(-100)).current;
 
   useEffect(() => {
     Animated.spring(translateY, {
@@ -105,7 +110,7 @@ function AlertBanner({
 
     const t = setTimeout(() => {
       Animated.timing(translateY, {
-        toValue: -80,
+        toValue: -100,
         duration: 300,
         useNativeDriver: true,
       }).start(onDismiss);
@@ -116,16 +121,23 @@ function AlertBanner({
 
   const dismiss = () => {
     Animated.timing(translateY, {
-      toValue: -80,
+      toValue: -100,
       duration: 250,
       useNativeDriver: true,
     }).start(onDismiss);
   };
 
+  const bgColor = type === "safety" ? "#C8303A" : "#1C1B18";
+
   return (
-    <Animated.View style={[styles.banner, { transform: [{ translateY }] }]}>
+    <Animated.View
+      style={[
+        styles.banner,
+        { backgroundColor: bgColor, transform: [{ translateY }] },
+      ]}
+    >
       <View style={styles.bannerLeft}>
-        <Feather name="alert-triangle" size={14} color="#FFFFFF" />
+        <Text style={styles.bannerIcon}>{icon}</Text>
         <Text style={styles.bannerText}>{message}</Text>
       </View>
       <Pressable onPress={dismiss} hitSlop={12}>
@@ -268,9 +280,11 @@ function AlertRow({ color, text, time }: { color: string; text: string; time: st
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function PulseScreen() {
   const insets = useSafeAreaInsets();
-  const { profile, clearProfile } = useProfile();
+  const { profile, clearProfile, updateProfile } = useProfile();
   const [showBanner, setShowBanner] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
+  const [notifySafety, setNotifySafety] = useState(profile?.notifySafety ?? true);
+  const [notifyEvents, setNotifyEvents] = useState(profile?.notifyEvents ?? true);
   const [loading] = useState(false);
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 84 : insets.bottom + 72;
@@ -290,6 +304,8 @@ export default function PulseScreen() {
       {showBanner && (
         <AlertBanner
           message="DePaul vs Marquette starts in 60 min →"
+          type="event"
+          icon="🏀"
           onDismiss={() => setShowBanner(false)}
         />
       )}
@@ -505,9 +521,9 @@ export default function PulseScreen() {
           <View style={styles.alertsCard}>
             <AlertRow color="#F59E0B" text="Traffic blocked on State St" time="Just now" />
             <View style={styles.alertDivider} />
-            <AlertRow color={Colors.success} text="Noise complaint near DePaul" time="Just now" />
+            <AlertRow color={Colors.success} text="Noise complaint near DePaul" time="2 min ago" />
             <View style={styles.alertDivider} />
-            <AlertRow color={Colors.danger} text="Fire alarm on Wabash" time="Just now" />
+            <AlertRow color={Colors.danger} text="Fire alarm on Wabash" time="5 min ago" />
           </View>
         </View>
 
@@ -549,6 +565,42 @@ export default function PulseScreen() {
           <View style={styles.modalHandle} />
           <Text style={styles.modalTitle}>Settings</Text>
 
+          {/* Notification toggles */}
+          <Text style={styles.settingsSectionLabel}>Notifications</Text>
+          <View style={styles.notifCard}>
+            <View style={styles.notifRow}>
+              <View style={styles.notifText}>
+                <Text style={styles.notifLabel}>Safety Alerts</Text>
+                <Text style={styles.notifDesc}>Incidents, blocked streets, emergencies</Text>
+              </View>
+              <Switch
+                value={notifySafety}
+                onValueChange={(v) => {
+                  setNotifySafety(v);
+                  updateProfile({ notifySafety: v });
+                }}
+                trackColor={{ false: "#E8E5DF", true: Colors.accent }}
+                thumbColor="#FFFFFF"
+              />
+            </View>
+            <View style={styles.notifDivider} />
+            <View style={styles.notifRow}>
+              <View style={styles.notifText}>
+                <Text style={styles.notifLabel}>Sports & Events</Text>
+                <Text style={styles.notifDesc}>Game starts, show doors, event reminders</Text>
+              </View>
+              <Switch
+                value={notifyEvents}
+                onValueChange={(v) => {
+                  setNotifyEvents(v);
+                  updateProfile({ notifyEvents: v });
+                }}
+                trackColor={{ false: "#E8E5DF", true: Colors.accent }}
+                thumbColor="#FFFFFF"
+              />
+            </View>
+          </View>
+
           <Pressable
             style={({ pressed }) => [
               styles.resetBtn,
@@ -562,7 +614,7 @@ export default function PulseScreen() {
             }}
           >
             <Feather name="refresh-ccw" size={18} color="#FFFFFF" />
-            <Text style={styles.resetBtnText}>Restart Onboarding</Text>
+            <Text style={styles.resetBtnText}>Reset Account</Text>
           </Pressable>
 
           <Pressable
@@ -587,18 +639,19 @@ const styles = StyleSheet.create({
   // Banner
   banner: {
     position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
+    top: 54,
+    left: 12,
+    right: 12,
     zIndex: 100,
-    backgroundColor: Colors.accent,
+    borderRadius: 14,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 13,
   },
-  bannerLeft: { flexDirection: "row", alignItems: "center", gap: 8, flex: 1 },
+  bannerLeft: { flexDirection: "row", alignItems: "center", gap: 10, flex: 1 },
+  bannerIcon: { fontSize: 16 },
   bannerText: {
     fontFamily: "DMSans_500Medium",
     fontSize: 13,
@@ -1020,6 +1073,47 @@ const styles = StyleSheet.create({
     fontFamily: "DMMono_400Regular",
     fontSize: 11,
     color: Colors.textTertiary,
+  },
+
+  // Notification card (in settings modal and step2)
+  notifCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    overflow: "hidden",
+    marginBottom: 4,
+  },
+  notifRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 12,
+  },
+  notifText: { flex: 1, gap: 2 },
+  notifLabel: {
+    fontFamily: "DMSans_600SemiBold",
+    fontSize: 14,
+    color: Colors.textPrimary,
+  },
+  notifDesc: {
+    fontFamily: "DMMono_400Regular",
+    fontSize: 10,
+    color: Colors.textTertiary,
+    letterSpacing: 0.2,
+  },
+  notifDivider: {
+    height: 1,
+    backgroundColor: Colors.border,
+    marginLeft: 16,
+  },
+  settingsSectionLabel: {
+    fontFamily: "DMSans_600SemiBold",
+    fontSize: 13,
+    color: Colors.textSecondary,
+    marginBottom: 8,
+    marginTop: 4,
   },
 
   // Settings modal

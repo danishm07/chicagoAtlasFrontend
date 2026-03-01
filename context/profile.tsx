@@ -14,10 +14,13 @@ export interface LoopProfile {
   name: string;
   personas: string[];
   university: string;
-  interests: string[];
   homeZone: string;
   currentZone: string;
   onboardedAt: string;
+  notifySafety?: boolean;
+  notifyEvents?: boolean;
+  emergencyName?: string;
+  emergencyPhone?: string;
 }
 
 interface ProfileContextValue {

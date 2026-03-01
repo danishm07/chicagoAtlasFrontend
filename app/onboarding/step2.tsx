@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Platform,
   Animated,
+  Switch,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -164,12 +165,15 @@ export default function OnboardingStep2() {
   const params = useLocalSearchParams<{
     name: string;
     personas: string;
-    interests: string;
+    emergencyName: string;
+    emergencyPhone: string;
   }>();
   const { saveProfile } = useProfile();
 
   const [university, setUniversity] = useState("");
   const [homeZone, setHomeZone] = useState("");
+  const [notifySafety, setNotifySafety] = useState(true);
+  const [notifyEvents, setNotifyEvents] = useState(true);
   const ctaScale = useRef(new Animated.Value(1)).current;
 
   const isReady = university !== "" && homeZone !== "";
@@ -185,11 +189,14 @@ export default function OnboardingStep2() {
     await saveProfile({
       name: params.name ?? "",
       personas: params.personas ? params.personas.split(",").filter(Boolean) : [],
-      interests: params.interests ? params.interests.split(",").filter(Boolean) : [],
       university,
       homeZone,
       currentZone: homeZone,
       onboardedAt: new Date().toISOString(),
+      notifySafety,
+      notifyEvents,
+      emergencyName: params.emergencyName ?? "",
+      emergencyPhone: params.emergencyPhone ?? "",
     });
 
     router.replace("/(tabs)");
@@ -253,6 +260,39 @@ export default function OnboardingStep2() {
                 pulsing={z.pulsing}
               />
             ))}
+          </View>
+        </View>
+
+        {/* Notifications */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Notifications</Text>
+          <Text style={styles.sectionSubtitle}>Choose what you want to be alerted about.</Text>
+          <View style={styles.notifCard}>
+            <View style={styles.notifRow}>
+              <View style={styles.notifText}>
+                <Text style={styles.notifLabel}>Safety Alerts</Text>
+                <Text style={styles.notifDesc}>Incidents, blocked streets, emergencies</Text>
+              </View>
+              <Switch
+                value={notifySafety}
+                onValueChange={setNotifySafety}
+                trackColor={{ false: "#E8E5DF", true: Colors.accent }}
+                thumbColor="#FFFFFF"
+              />
+            </View>
+            <View style={styles.notifDivider} />
+            <View style={styles.notifRow}>
+              <View style={styles.notifText}>
+                <Text style={styles.notifLabel}>Sports & Events</Text>
+                <Text style={styles.notifDesc}>Game starts, show doors, event reminders</Text>
+              </View>
+              <Switch
+                value={notifyEvents}
+                onValueChange={setNotifyEvents}
+                trackColor={{ false: "#E8E5DF", true: Colors.accent }}
+                thumbColor="#FFFFFF"
+              />
+            </View>
           </View>
         </View>
       </ScrollView>
@@ -339,7 +379,14 @@ const styles = StyleSheet.create({
     fontFamily: "DMSans_600SemiBold",
     fontSize: 15,
     color: Colors.textPrimary,
+    marginBottom: 6,
+  },
+  sectionSubtitle: {
+    fontFamily: "DMMono_400Regular",
+    fontSize: 11,
+    color: Colors.textTertiary,
     marginBottom: 12,
+    letterSpacing: 0.2,
   },
   cardList: {
     gap: 8,
@@ -439,6 +486,40 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: Colors.accent,
   },
+
+  // Notifications card
+  notifCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    overflow: "hidden",
+  },
+  notifRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 12,
+  },
+  notifText: { flex: 1, gap: 2 },
+  notifLabel: {
+    fontFamily: "DMSans_600SemiBold",
+    fontSize: 15,
+    color: Colors.textPrimary,
+  },
+  notifDesc: {
+    fontFamily: "DMMono_400Regular",
+    fontSize: 11,
+    color: Colors.textTertiary,
+    letterSpacing: 0.2,
+  },
+  notifDivider: {
+    height: 1,
+    backgroundColor: Colors.border,
+    marginLeft: 16,
+  },
+
   ctaWrapper: {
     position: "absolute",
     bottom: 0,

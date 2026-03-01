@@ -15,20 +15,13 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 
-const PERSONAS = ["Student", "Commuter", "Local Resident", "Visitor"];
-const INTERESTS = [
-  "Food & Drinks",
-  "Events & Shows",
-  "Safety & Navigation",
-  "Sports",
-  "Local Gems",
-  "Nightlife",
-];
+const PERSONAS = ["University Student", "Commuter", "Local Resident", "Visitor"];
 
 interface StepData {
   name: string;
   personas: string[];
-  interests: string[];
+  emergencyName: string;
+  emergencyPhone: string;
 }
 
 function PillButton({
@@ -82,7 +75,8 @@ export default function OnboardingStep1() {
   const [data, setData] = useState<StepData>({
     name: "",
     personas: [],
-    interests: [],
+    emergencyName: "",
+    emergencyPhone: "",
   });
   const ctaScale = useRef(new Animated.Value(1)).current;
 
@@ -90,21 +84,38 @@ export default function OnboardingStep1() {
 
   const togglePersona = (p: string) => {
     setData((prev) => {
-      if (prev.personas.includes(p)) {
-        return { ...prev, personas: prev.personas.filter((x) => x !== p) };
-      }
-      if (prev.personas.length >= 2) return prev;
-      return { ...prev, personas: [...prev.personas, p] };
-    });
-  };
+      const current = prev.personas;
 
-  const toggleInterest = (i: string) => {
-    setData((prev) => {
-      if (prev.interests.includes(i)) {
-        return { ...prev, interests: prev.interests.filter((x) => x !== i) };
+      // Deselect if already selected
+      if (current.includes(p)) {
+        return { ...prev, personas: current.filter((x) => x !== p) };
       }
-      if (prev.interests.length >= 3) return prev;
-      return { ...prev, interests: [...prev.interests, i] };
+
+      // Visitor is always solo
+      if (p === "Visitor") {
+        return { ...prev, personas: ["Visitor"] };
+      }
+
+      // Selecting anything while Visitor is active replaces it
+      if (current.includes("Visitor")) {
+        return { ...prev, personas: [p] };
+      }
+
+      // Commuter and Local Resident are mutually exclusive
+      if (p === "Commuter") {
+        const filtered = current.filter((x) => x !== "Local Resident");
+        if (filtered.length >= 2) return prev;
+        return { ...prev, personas: [...filtered, p] };
+      }
+      if (p === "Local Resident") {
+        const filtered = current.filter((x) => x !== "Commuter");
+        if (filtered.length >= 2) return prev;
+        return { ...prev, personas: [...filtered, p] };
+      }
+
+      // Max 2
+      if (current.length >= 2) return prev;
+      return { ...prev, personas: [...current, p] };
     });
   };
 
@@ -120,7 +131,8 @@ export default function OnboardingStep1() {
       params: {
         name: data.name,
         personas: data.personas.join(","),
-        interests: data.interests.join(","),
+        emergencyName: data.emergencyName,
+        emergencyPhone: data.emergencyPhone,
       },
     });
   };
@@ -172,35 +184,57 @@ export default function OnboardingStep1() {
             <Text style={styles.helperText}>Select up to 2</Text>
           </View>
           <View style={styles.pillRow}>
-            {PERSONAS.map((p) => (
-              <PillButton
-                key={p}
-                label={p}
-                selected={data.personas.includes(p)}
-                onPress={() => togglePersona(p)}
-                disabled={data.personas.length >= 2}
-              />
-            ))}
+            {PERSONAS.map((p) => {
+              const isSelected = data.personas.includes(p);
+              const isDisabled =
+                !isSelected &&
+                (data.personas.length >= 2 ||
+                  (p !== "Visitor" && data.personas.includes("Visitor")));
+              return (
+                <PillButton
+                  key={p}
+                  label={p}
+                  selected={isSelected}
+                  onPress={() => togglePersona(p)}
+                  disabled={isDisabled}
+                />
+              );
+            })}
           </View>
         </View>
 
-        {/* Interests pills */}
+        {/* Emergency Contact */}
         <View style={styles.section}>
           <View style={styles.fieldLabelRow}>
-            <Text style={styles.fieldLabel}>What are you into?</Text>
-            <Text style={styles.helperText}>Select up to 3</Text>
+            <Text style={styles.fieldLabel}>Emergency Contact</Text>
+            <Text style={styles.helperText}>Optional</Text>
           </View>
-          <View style={styles.pillRow}>
-            {INTERESTS.map((i) => (
-              <PillButton
-                key={i}
-                label={i}
-                selected={data.interests.includes(i)}
-                onPress={() => toggleInterest(i)}
-                disabled={data.interests.length >= 3}
-              />
-            ))}
+          <Text style={styles.sectionSubtitle}>Stored only on your device.</Text>
+          <View style={[styles.inputWrapper, { marginBottom: 10 }]}>
+            <TextInput
+              style={styles.input}
+              placeholder="Contact name (e.g. Mom, Dad)"
+              placeholderTextColor={Colors.textTertiary}
+              value={data.emergencyName}
+              onChangeText={(t) => setData((prev) => ({ ...prev, emergencyName: t }))}
+              autoCapitalize="words"
+              returnKeyType="next"
+            />
           </View>
+          <View style={styles.inputWrapper}>
+            <TextInput
+              style={styles.input}
+              placeholder="Phone number"
+              placeholderTextColor={Colors.textTertiary}
+              value={data.emergencyPhone}
+              onChangeText={(t) => setData((prev) => ({ ...prev, emergencyPhone: t }))}
+              keyboardType="phone-pad"
+              returnKeyType="done"
+            />
+          </View>
+          <Text style={styles.emergencyHelper}>
+            Only used if you choose to share your location in an emergency. Never sent anywhere.
+          </Text>
         </View>
       </ScrollView>
 
@@ -283,13 +317,21 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "baseline",
     justifyContent: "space-between",
-    marginBottom: 12,
+    marginBottom: 6,
   },
   fieldLabel: {
     fontFamily: "DMSans_600SemiBold",
     fontSize: 15,
     color: Colors.textPrimary,
     marginBottom: 12,
+  },
+  sectionSubtitle: {
+    fontFamily: "DMMono_400Regular",
+    fontSize: 11,
+    color: Colors.textTertiary,
+    marginBottom: 12,
+    marginTop: -8,
+    letterSpacing: 0.2,
   },
   helperText: {
     fontFamily: "DMMono_400Regular",
@@ -310,6 +352,14 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     paddingHorizontal: 16,
     paddingVertical: 14,
+  },
+  emergencyHelper: {
+    fontFamily: "DMMono_400Regular",
+    fontSize: 10,
+    color: Colors.textTertiary,
+    marginTop: 10,
+    lineHeight: 15,
+    letterSpacing: 0.2,
   },
   pillRow: {
     flexDirection: "row",

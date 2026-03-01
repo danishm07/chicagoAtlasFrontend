@@ -17,6 +17,16 @@ import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { useProfile } from "@/context/profile";
 
+// ─── Zone label map ───────────────────────────────────────────────────────────
+
+const ZONE_LABELS: Record<string, string> = {
+  north: "North Loop",
+  depaul_loop: "DePaul Loop",
+  west: "West Loop",
+  south: "South Loop",
+  gps: "My Location",
+};
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Message = {
@@ -44,7 +54,7 @@ function getMockResponse(input: string): { text: string; sources: string[] } {
       sources: ["Yelp Fusion", "Google Maps"],
     };
   }
-  if (q.includes("busy") || q.includes("crowd") || q.includes("crowd")) {
+  if (q.includes("busy") || q.includes("crowd")) {
     return {
       text: "Loop Density Report — right now:\n\n📍 Millennium Park: 3× normal traffic\n📍 State St: Moderate\n📍 DePaul Loop Campus area: Normal\n\nLoop Health Score: 87/100 — Moderately Busy. Best time to move: after 8 PM.",
       sources: ["Chicago 311", "Google Density", "CTA Alerts"],
@@ -204,12 +214,10 @@ export default function ChatScreen() {
   const [isSending, setIsSending] = useState(false);
   const inputRef = useRef<TextInput>(null);
   const topPad = Platform.OS === "web" ? 67 : insets.top;
-  const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
+  const bottomPad = Platform.OS === "web" ? 84 : insets.bottom + 80;
 
   const displayName = profile?.name || "there";
-  const zone = profile?.homeZone
-    ? profile.homeZone.split("_").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
-    : "The Loop";
+  const zone = ZONE_LABELS[profile?.homeZone ?? ""] ?? "DePaul Loop";
   const persona = profile?.personas?.[0] || "Visitor";
 
   // Newest-first for inverted FlatList
@@ -237,7 +245,6 @@ export default function ChatScreen() {
     },
   ]);
 
-  // Use ref to avoid stale closure in async send
   const messagesRef = useRef(messages);
   useEffect(() => {
     messagesRef.current = messages;
@@ -259,7 +266,6 @@ export default function ChatScreen() {
         timestamp: new Date(),
       };
 
-      // Add user message + typing indicator (newest first)
       const typingMsg: Message = {
         id: "typing",
         role: "typing",
@@ -272,7 +278,6 @@ export default function ChatScreen() {
       // TODO: Replace mock responses with POST /api/chat
       // Body: { message, history, persona, university, currentZone, savedItems }
       // Response: streaming text from Groq Llama 3.3 70B
-      // System prompt injects all live Chicago data as context
       setTimeout(() => {
         const { text: responseText, sources } = getMockResponse(msg);
         const aiMsg: Message = {
@@ -293,13 +298,11 @@ export default function ChatScreen() {
     [input, isSending]
   );
 
-  const keyboardOffset = Platform.OS === "web" ? 0 : 0;
-
   return (
     <KeyboardAvoidingView
       style={[styles.root, { paddingTop: topPad }]}
       behavior="padding"
-      keyboardVerticalOffset={keyboardOffset}
+      keyboardVerticalOffset={0}
     >
       {/* ── Header ── */}
       <View style={styles.header}>
@@ -357,12 +360,7 @@ export default function ChatScreen() {
                 handleSend(qp);
               }}
             >
-              <Text
-                style={[
-                  styles.quickChipText,
-                  { color: Colors.textSecondary },
-                ]}
-              >
+              <Text style={[styles.quickChipText, { color: Colors.textSecondary }]}>
                 {qp}
               </Text>
             </Pressable>
@@ -371,7 +369,7 @@ export default function ChatScreen() {
       </View>
 
       {/* ── Input row ── */}
-      <View style={[styles.inputRow, { paddingBottom: bottomPad + 8 }]}>
+      <View style={[styles.inputRow, { paddingBottom: bottomPad }]}>
         <TextInput
           ref={inputRef}
           style={styles.textInput}
@@ -416,7 +414,6 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.background },
 
-  // Header
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -470,7 +467,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
 
-  // Context pill
   contextRow: {
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -492,7 +488,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
 
-  // Messages
   messageList: {
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -556,7 +551,6 @@ const styles = StyleSheet.create({
   timestampUser: { textAlign: "right" },
   timestampAI: { textAlign: "left" },
 
-  // Typing indicator
   typingDots: {
     flexDirection: "row",
     gap: 4,
@@ -571,7 +565,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.textTertiary,
   },
 
-  // Quick chips
   quickArea: {
     borderTopWidth: 1,
     borderTopColor: Colors.border,
@@ -594,7 +587,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 
-  // Input
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
