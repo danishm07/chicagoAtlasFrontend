@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import { View, ActivityIndicator, StyleSheet } from "react-native";
 import { router } from "expo-router";
 import { useProfile } from "@/context/profile";
-import Colors from "@/constants/colors";
 
 export default function IndexGate() {
   const { profile, isLoading } = useProfile();
@@ -12,13 +11,13 @@ export default function IndexGate() {
     if (profile && profile.onboardedAt) {
       router.replace("/(tabs)");
     } else {
-      router.replace("/onboarding/step1");
+      router.replace("/splash");
     }
   }, [isLoading, profile]);
 
   return (
     <View style={styles.root}>
-      <ActivityIndicator color={Colors.accent} />
+      <ActivityIndicator color="#E8533A" />
     </View>
   );
 }
@@ -26,7 +25,7 @@ export default function IndexGate() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: "#0F0F0F",
     alignItems: "center",
     justifyContent: "center",
   },

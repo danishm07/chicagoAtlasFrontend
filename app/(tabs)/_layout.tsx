@@ -11,16 +11,16 @@ function NativeTabLayout() {
   return (
     <NativeTabs>
       <NativeTabs.Trigger name="index">
-        <Icon sf={{ default: "waveform", selected: "waveform" }} />
-        <Label>Pulse</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="feed">
-        <Icon sf={{ default: "square.grid.2x2", selected: "square.grid.2x2.fill" }} />
-        <Label>Feed</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="chat">
         <Icon sf={{ default: "bubble.left", selected: "bubble.left.fill" }} />
-        <Label>Chat</Label>
+        <Label>Ask</Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="signals">
+        <Icon sf={{ default: "antenna.radiowaves.left.and.right", selected: "antenna.radiowaves.left.and.right" }} />
+        <Label>Signals</Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="culture">
+        <Icon sf={{ default: "flame", selected: "flame.fill" }} />
+        <Label>Culture</Label>
       </NativeTabs.Trigger>
     </NativeTabs>
   );
@@ -37,7 +37,6 @@ function ClassicTabLayout() {
         tabBarActiveTintColor: Colors.accent,
         tabBarInactiveTintColor: Colors.textTertiary,
         tabBarLabelStyle: {
-          fontFamily: "DMSans_500Medium",
           fontSize: 11,
           marginTop: -2,
         },
@@ -60,27 +59,27 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Pulse",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="pulse" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="feed"
-        options={{
-          title: "Feed",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="grid-outline" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="chat"
-        options={{
-          title: "Chat",
+          title: "Ask",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="chatbubble-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="signals"
+        options={{
+          title: "Signals",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="radio-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="culture"
+        options={{
+          title: "Culture",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="flame-outline" size={size} color={color} />
           ),
         }}
       />

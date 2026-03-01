@@ -11,130 +11,68 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 
-const PERSONAS = ["University Student", "Commuter", "Local Resident", "Visitor"];
+const PERSONAS = [
+  { id: "student", label: "🎓 Student" },
+  { id: "commuter", label: "💼 Commuter" },
+  { id: "local", label: "🏙️ Local" },
+  { id: "visitor", label: "✈️ Visitor" },
+];
 
-interface StepData {
-  name: string;
-  personas: string[];
-  emergencyName: string;
-  emergencyPhone: string;
-}
-
-function PillButton({
-  label,
-  selected,
-  onPress,
-  disabled,
-}: {
-  label: string;
-  selected: boolean;
-  onPress: () => void;
-  disabled: boolean;
-}) {
-  const scale = useRef(new Animated.Value(1)).current;
-
-  const handlePress = () => {
-    Animated.sequence([
-      Animated.timing(scale, { toValue: 0.94, duration: 80, useNativeDriver: true }),
-      Animated.timing(scale, { toValue: 1, duration: 120, useNativeDriver: true }),
-    ]).start();
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onPress();
-  };
-
+function ProgressBar({ step, total }: { step: number; total: number }) {
   return (
-    <Pressable onPress={handlePress} disabled={disabled && !selected}>
-      <Animated.View
-        style={[
-          styles.pill,
-          selected && styles.pillSelected,
-          disabled && !selected && styles.pillDisabled,
-          { transform: [{ scale }] },
-        ]}
-      >
-        <Text
+    <View style={styles.progressBar}>
+      {Array.from({ length: total }).map((_, i) => (
+        <View
+          key={i}
           style={[
-            styles.pillText,
-            selected && styles.pillTextSelected,
-            disabled && !selected && styles.pillTextDisabled,
+            styles.progressSegment,
+            i < step && styles.progressSegmentFilled,
           ]}
-        >
-          {label}
-        </Text>
-      </Animated.View>
-    </Pressable>
+        />
+      ))}
+    </View>
   );
 }
 
 export default function OnboardingStep1() {
   const insets = useSafeAreaInsets();
-  const [data, setData] = useState<StepData>({
-    name: "",
-    personas: [],
-    emergencyName: "",
-    emergencyPhone: "",
-  });
+  const [name, setName] = useState("");
+  const [personas, setPersonas] = useState<string[]>([]);
   const ctaScale = useRef(new Animated.Value(1)).current;
 
-  const isReady = data.name.trim().length > 0 || data.personas.length > 0;
-
-  const togglePersona = (p: string) => {
-    setData((prev) => {
-      const current = prev.personas;
-
-      // Deselect if already selected
-      if (current.includes(p)) {
-        return { ...prev, personas: current.filter((x) => x !== p) };
-      }
-
-      // Visitor is always solo
-      if (p === "Visitor") {
-        return { ...prev, personas: ["Visitor"] };
-      }
-
-      // Selecting anything while Visitor is active replaces it
-      if (current.includes("Visitor")) {
-        return { ...prev, personas: [p] };
-      }
-
-      // Commuter and Local Resident are mutually exclusive
-      if (p === "Commuter") {
-        const filtered = current.filter((x) => x !== "Local Resident");
-        if (filtered.length >= 2) return prev;
-        return { ...prev, personas: [...filtered, p] };
-      }
-      if (p === "Local Resident") {
-        const filtered = current.filter((x) => x !== "Commuter");
-        if (filtered.length >= 2) return prev;
-        return { ...prev, personas: [...filtered, p] };
-      }
-
-      // Max 2
-      if (current.length >= 2) return prev;
-      return { ...prev, personas: [...current, p] };
+  const togglePersona = (id: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setPersonas((prev) => {
+      if (prev.includes(id)) return prev.filter((x) => x !== id);
+      if (id === "visitor") return ["visitor"];
+      if (prev.includes("visitor")) return [id];
+      if (prev.length >= 2) return prev;
+      return [...prev, id];
     });
   };
 
   const handleContinue = () => {
-    if (!isReady) return;
     Animated.sequence([
       Animated.timing(ctaScale, { toValue: 0.97, duration: 80, useNativeDriver: true }),
       Animated.timing(ctaScale, { toValue: 1, duration: 120, useNativeDriver: true }),
     ]).start();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push({
-      pathname: "/onboarding/step2",
-      params: {
-        name: data.name,
-        personas: data.personas.join(","),
-        emergencyName: data.emergencyName,
-        emergencyPhone: data.emergencyPhone,
-      },
-    });
+
+    const params = { name, personas: personas.join(",") };
+
+    if (personas.includes("student")) {
+      router.push({ pathname: "/onboarding/step1b", params });
+    } else {
+      router.push({ pathname: "/onboarding/step2", params });
+    }
+  };
+
+  const handleSkip = () => {
+    router.push({ pathname: "/onboarding/step2", params: { name, personas: personas.join(",") } });
   };
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
@@ -142,42 +80,39 @@ export default function OnboardingStep1() {
 
   return (
     <View style={[styles.root, { paddingTop: topPad }]}>
+      <ProgressBar step={1} total={4} />
+
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[styles.content, { paddingBottom: bottomPad + 120 }]}
+        contentContainerStyle={[styles.content, { paddingBottom: bottomPad + 140 }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Logo area */}
         <View style={styles.logoRow}>
           <View style={styles.logoIcon}>
-            <Feather name="zap" size={22} color={Colors.accent} />
+            <Ionicons name="pulse" size={18} color="#E8533A" />
           </View>
-          <Text style={styles.logoText}>Loop Pulse</Text>
+          <Text style={styles.logoText}>Chicago Pulse</Text>
         </View>
 
-        <Text style={styles.heading}>Welcome to Loop.</Text>
-        <Text style={styles.subtitle}>
-          Feel the pulse of your city. Let's get you set up.
-        </Text>
+        <Text style={styles.heading}>Who are you{"\n"}in Chicago?</Text>
+        <Text style={styles.subtitle}>Helps Harold know what matters to you.</Text>
 
-        {/* Name field */}
         <View style={styles.section}>
-          <Text style={styles.fieldLabel}>What should we call you?</Text>
+          <Text style={styles.fieldLabel}>What should Harold call you?</Text>
           <View style={styles.inputWrapper}>
             <TextInput
               style={styles.input}
-              placeholder="First name"
+              placeholder="Your name (optional)"
               placeholderTextColor={Colors.textTertiary}
-              value={data.name}
-              onChangeText={(t) => setData((prev) => ({ ...prev, name: t }))}
+              value={name}
+              onChangeText={setName}
               autoCapitalize="words"
               returnKeyType="done"
             />
           </View>
         </View>
 
-        {/* Persona pills */}
         <View style={styles.section}>
           <View style={styles.fieldLabelRow}>
             <Text style={styles.fieldLabel}>I am a...</Text>
@@ -185,78 +120,49 @@ export default function OnboardingStep1() {
           </View>
           <View style={styles.pillRow}>
             {PERSONAS.map((p) => {
-              const isSelected = data.personas.includes(p);
-              const isDisabled =
-                !isSelected &&
-                (data.personas.length >= 2 ||
-                  (p !== "Visitor" && data.personas.includes("Visitor")));
+              const selected = personas.includes(p.id);
+              const disabled =
+                !selected &&
+                (personas.length >= 2 ||
+                  (p.id !== "visitor" && personas.includes("visitor")));
               return (
-                <PillButton
-                  key={p}
-                  label={p}
-                  selected={isSelected}
-                  onPress={() => togglePersona(p)}
-                  disabled={isDisabled}
-                />
+                <Pressable
+                  key={p.id}
+                  onPress={() => !disabled && togglePersona(p.id)}
+                  style={({ pressed }) => [
+                    styles.pill,
+                    selected && styles.pillSelected,
+                    disabled && styles.pillDisabled,
+                    pressed && !disabled && { opacity: 0.75 },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.pillText,
+                      selected && styles.pillTextSelected,
+                      disabled && styles.pillTextDisabled,
+                    ]}
+                  >
+                    {p.label}
+                  </Text>
+                </Pressable>
               );
             })}
           </View>
         </View>
-
-        {/* Emergency Contact */}
-        <View style={styles.section}>
-          <View style={styles.fieldLabelRow}>
-            <Text style={styles.fieldLabel}>Emergency Contact</Text>
-            <Text style={styles.helperText}>Optional</Text>
-          </View>
-          <Text style={styles.sectionSubtitle}>Stored only on your device.</Text>
-          <View style={[styles.inputWrapper, { marginBottom: 10 }]}>
-            <TextInput
-              style={styles.input}
-              placeholder="Contact name (e.g. Mom, Dad)"
-              placeholderTextColor={Colors.textTertiary}
-              value={data.emergencyName}
-              onChangeText={(t) => setData((prev) => ({ ...prev, emergencyName: t }))}
-              autoCapitalize="words"
-              returnKeyType="next"
-            />
-          </View>
-          <View style={styles.inputWrapper}>
-            <TextInput
-              style={styles.input}
-              placeholder="Phone number"
-              placeholderTextColor={Colors.textTertiary}
-              value={data.emergencyPhone}
-              onChangeText={(t) => setData((prev) => ({ ...prev, emergencyPhone: t }))}
-              keyboardType="phone-pad"
-              returnKeyType="done"
-            />
-          </View>
-          <Text style={styles.emergencyHelper}>
-            Only used if you choose to share your location in an emergency. Never sent anywhere.
-          </Text>
-        </View>
       </ScrollView>
 
-      {/* CTA */}
       <View style={[styles.ctaWrapper, { paddingBottom: bottomPad + 16 }]}>
-        <Pressable onPress={handleContinue} disabled={!isReady}>
+        <Pressable onPress={handleContinue}>
           <Animated.View
-            style={[
-              styles.ctaButton,
-              isReady ? styles.ctaButtonReady : styles.ctaButtonDisabled,
-              { transform: [{ scale: ctaScale }] },
-            ]}
+            style={[styles.ctaButton, { transform: [{ scale: ctaScale }] }]}
           >
-            <Text style={[styles.ctaText, isReady && styles.ctaTextReady]}>
-              Continue
-            </Text>
-            <Feather
-              name="arrow-right"
-              size={18}
-              color={isReady ? "#FFFFFF" : Colors.textTertiary}
-            />
+            <Text style={styles.ctaText}>Continue</Text>
+            <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
           </Animated.View>
+        </Pressable>
+        <Pressable onPress={handleSkip} style={styles.skipBtn}>
+          <Text style={styles.skipText}>Skip</Text>
         </Pressable>
       </View>
     </View>
@@ -264,80 +170,75 @@ export default function OnboardingStep1() {
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  scroll: {
-    flex: 1,
-  },
-  content: {
+  root: { flex: 1, backgroundColor: Colors.background },
+  progressBar: {
+    flexDirection: "row",
     paddingHorizontal: 24,
-    paddingTop: 20,
+    paddingTop: 16,
+    paddingBottom: 8,
+    gap: 6,
   },
+  progressSegment: {
+    flex: 1,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.border,
+  },
+  progressSegmentFilled: {
+    backgroundColor: Colors.accent,
+  },
+  scroll: { flex: 1 },
+  content: { paddingHorizontal: 24, paddingTop: 16 },
   logoRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    marginBottom: 32,
+    marginBottom: 28,
   },
   logoIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 8,
     backgroundColor: "#FEF0ED",
     alignItems: "center",
     justifyContent: "center",
   },
   logoText: {
-    fontFamily: "DMSans_700Bold",
-    fontSize: 16,
+    fontSize: 15,
+    fontWeight: "600",
     color: Colors.textPrimary,
     letterSpacing: -0.3,
   },
   heading: {
-    fontFamily: "DMSans_700Bold",
     fontSize: 34,
+    fontWeight: "700",
     color: Colors.textPrimary,
     letterSpacing: -0.8,
     lineHeight: 40,
     marginBottom: 8,
   },
   subtitle: {
-    fontFamily: "DMSans_400Regular",
     fontSize: 16,
     color: Colors.textSecondary,
     lineHeight: 24,
-    marginBottom: 40,
+    marginBottom: 36,
   },
-  section: {
-    marginBottom: 32,
-  },
+  section: { marginBottom: 32 },
   fieldLabelRow: {
     flexDirection: "row",
     alignItems: "baseline",
     justifyContent: "space-between",
-    marginBottom: 6,
+    marginBottom: 12,
   },
   fieldLabel: {
-    fontFamily: "DMSans_600SemiBold",
     fontSize: 15,
+    fontWeight: "600",
     color: Colors.textPrimary,
     marginBottom: 12,
   },
-  sectionSubtitle: {
-    fontFamily: "DMMono_400Regular",
-    fontSize: 11,
-    color: Colors.textTertiary,
-    marginBottom: 12,
-    marginTop: -8,
-    letterSpacing: 0.2,
-  },
   helperText: {
-    fontFamily: "DMMono_400Regular",
-    fontSize: 11,
+    fontSize: 12,
     color: Colors.textTertiary,
-    letterSpacing: 0.3,
   },
   inputWrapper: {
     backgroundColor: Colors.surface,
@@ -347,29 +248,16 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   input: {
-    fontFamily: "DMSans_400Regular",
     fontSize: 16,
     color: Colors.textPrimary,
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
-  emergencyHelper: {
-    fontFamily: "DMMono_400Regular",
-    fontSize: 10,
-    color: Colors.textTertiary,
-    marginTop: 10,
-    lineHeight: 15,
-    letterSpacing: 0.2,
-  },
-  pillRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
+  pillRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   pill: {
-    paddingHorizontal: 16,
-    paddingVertical: 9,
-    borderRadius: 20,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 24,
     borderWidth: 1.5,
     borderColor: Colors.border,
     backgroundColor: Colors.surface,
@@ -378,20 +266,14 @@ const styles = StyleSheet.create({
     borderColor: Colors.accent,
     backgroundColor: "#FEF0ED",
   },
-  pillDisabled: {
-    opacity: 0.45,
-  },
+  pillDisabled: { opacity: 0.4 },
   pillText: {
-    fontFamily: "DMSans_500Medium",
     fontSize: 14,
+    fontWeight: "500",
     color: Colors.textSecondary,
   },
-  pillTextSelected: {
-    color: Colors.accent,
-  },
-  pillTextDisabled: {
-    color: Colors.textTertiary,
-  },
+  pillTextSelected: { color: Colors.accent, fontWeight: "600" },
+  pillTextDisabled: { color: Colors.textTertiary },
   ctaWrapper: {
     position: "absolute",
     bottom: 0,
@@ -402,27 +284,28 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
+    gap: 12,
+    alignItems: "center",
   },
   ctaButton: {
+    width: "100%",
+    backgroundColor: Colors.textPrimary,
     borderRadius: 14,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
     paddingVertical: 16,
-  },
-  ctaButtonDisabled: {
-    backgroundColor: Colors.border,
-  },
-  ctaButtonReady: {
-    backgroundColor: Colors.accent,
+    alignSelf: "stretch",
   },
   ctaText: {
-    fontFamily: "DMSans_600SemiBold",
     fontSize: 16,
-    color: Colors.textTertiary,
-  },
-  ctaTextReady: {
+    fontWeight: "600",
     color: "#FFFFFF",
+  },
+  skipBtn: { paddingVertical: 4 },
+  skipText: {
+    fontSize: 14,
+    color: Colors.textTertiary,
   },
 });

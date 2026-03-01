@@ -1,80 +1,120 @@
-# Loop Pulse
+# Chicago Pulse
 
-A mobile PWA built with Expo Router (React Native), Express backend, and AsyncStorage for local persistence.
+A mobile PWA built with Expo Router (React Native), Express backend, and AsyncStorage for local persistence. Built for DemonHacks 2026.
 
 ## Architecture
 
 - **Frontend**: Expo Router (file-based routing), React Native Web for browser
 - **Backend**: Express on port 5000 (serves landing page + API)
 - **Frontend dev server**: Expo Metro on port 8081
-- **State**: AsyncStorage via ProfileContext, React Query for server data
+- **State**: AsyncStorage via ProfileContext + ThemeContext, React Query for server data
 
 ## Design System
 
+### Light Mode (default)
 - Background: `#F7F6F3` | Surface: `#FFFFFF` | Border: `#E8E5DF`
 - Text: `#1C1B18` (primary), `#7C7870` (secondary), `#B5B0A7` (tertiary)
-- Accent (coral): `#E8533A` | Success: `#16A34A` | Danger: `#C8303A` | Warning: `#B8860B`
-- DePaul blue: `#005596`
-- Fonts: DM Sans (`DMSans_400Regular/500Medium/600SemiBold/700Bold`) + DM Mono (`DMMono_400Regular/500Medium`)
-- Card radius: 16px | Hero: 24px | Pills: 20px
-- All styles in `constants/colors.ts`
+
+### Dark Mode
+- Background: `#0F0F0F` | Surface: `#1A1A1A` | Border: `#2A2A2A`
+- Text: `#F7F6F3` (primary), `#7C7870` (secondary), `#4A4A4A` (tertiary)
+
+### Shared Tokens
+- Accent (coral): `#E8533A` | Success: `#16A34A` | Danger: `#C8303A`
+- Fonts: System default (San Francisco on iOS, system font on web/Android)
+- Card radius: 16px | Pills: 24px
 
 ## File Structure
 
 ```
 app/
-  _layout.tsx              # Root layout: fonts, providers, Stack nav
-  index.tsx                # Routing gate: checks profile → onboarding or tabs
+  _layout.tsx              # Root layout: providers (Query, Profile, Theme), Stack nav
+  index.tsx                # Routing gate: checks profile → splash or tabs
+  splash.tsx               # Screen 0: dark splash with "Get Started" CTA
+  settings.tsx             # Full settings screen (push from any tab)
   onboarding/
-    step1.tsx              # Name, persona (max 2), interests (max 3)
-    step2.tsx              # University, home zone → saves to AsyncStorage
+    step1.tsx              # Who are you? Name + persona pills (max 2)
+    step1b.tsx             # Which school? (only if Student selected)
+    step2.tsx              # Interests: multi-select pills (max 3)
+    step3.tsx              # Where are you based? Zone selection
+    step4.tsx              # Safety + emergency contact + train alerts → saves profile
   (tabs)/
-    _layout.tsx            # Tab bar: Pulse / Feed / Chat (NativeTabs or classic)
-    index.tsx              # Pulse home screen (full prompt 2 layout)
-    feed.tsx               # Feed screen: Events/Spots/Trending segmented tabs, 60s coral progress bar
-    chat.tsx               # Chat screen: Pulse AI, inverted FlatList, quick chips, mock keyword responses
+    _layout.tsx            # Tab bar: Ask / Signals / Culture
+    index.tsx              # Ask tab — Harold chat (streaming-ready, mock by default)
+    signals.tsx            # Signals tab — widget cards, map placeholder, bottom drawer
+    culture.tsx            # Culture tab — Trending/Discover segmented sections
 
 context/
-  profile.tsx              # ProfileProvider + useProfile hook + AsyncStorage
+  profile.tsx              # ProfileProvider + useProfile hook
+  theme.tsx                # ThemeProvider + useTheme hook (persists to AsyncStorage)
 
 constants/
-  colors.ts                # Full design system color tokens
+  colors.ts                # Light + Dark color tokens (Colors, DarkColors)
+  config.ts                # Feature flags, BACKEND_URL, mock data (MOCK_SCORE, MOCK_FEED, MOCK_REPORTS)
 
 server/
   index.ts                 # Express setup, CORS, static serving
-  routes.ts                # API routes (currently empty)
+  routes.ts                # API routes
   storage.ts               # DB helpers
 ```
 
-## Profile Shape (localStorage key: `loop_pulse_profile`)
+## Profile Shape (AsyncStorage key: `chicago_pulse_profile`)
 
 ```json
 {
   "name": "string",
-  "personas": ["Student", "Commuter"],
-  "interests": ["Food & Drinks", "Events & Shows"],
-  "university": "depaul | uic | iit | columbia | roosevelt | none",
-  "homeZone": "north | depaul_loop | west | south | gps",
+  "personas": ["student", "commuter", "local", "visitor"],
+  "university": "depaul | iit | columbia | roosevelt | uic | other | \"\"",
+  "sportsNotifications": false,
+  "interests": ["food", "events", "sports", "live_music", "outdoor", "hidden_gems", "transit", "arts"],
+  "homeZone": "north_side | near_campus | loop | south_side | west_side | gps",
   "currentZone": "string",
+  "safetyAlerts": false,
+  "emergencyContact": { "name": "string", "phone": "string" } | null,
+  "trainAlerts": false,
   "onboardedAt": "ISO string"
 }
 ```
 
-## Onboarding Logic
+## Zone Label Map (ZONE_LABELS)
 
-- On app load: `app/index.tsx` checks AsyncStorage for `loop_pulse_profile`
-- If `onboardedAt` is set → redirect to `/(tabs)` (home)
-- Otherwise → redirect to `/onboarding/step1`
+```
+north_side → "North Side"
+near_campus → "Near Campus"
+loop → "The Loop"
+south_side → "South Side"
+west_side → "West Side"
+gps → "My Location"
+```
 
-## Completed Prompts
+## Feature Flags (constants/config.ts)
 
-- **Prompt 1**: Design system, onboarding steps 1 & 2, profile persistence, routing gate
-- **Prompt 2**: Full home screen (hero ring, data grid, game card, trending, alerts, chat preview, alert banner), tab navigation (Pulse/Feed/Chat), UIC added to university list
-- **Prompt 3**: Feed screen — 60s coral refresh bar, spring-animated segmented control (Events/Spots/Trending), gradient event cards, spots list with wait-time pills, trending rows with flame icons
-- **Prompt 4**: Chat screen — Pulse AI header with pulsing green dot, context pill, inverted FlatList with user/AI bubbles + source chips, 3-dot typing indicator, 5 quick-prompt chips, keyword-based mock AI responses
+- `USE_MOCK_DATA: true` — all data uses MOCK_SCORE/MOCK_FEED/MOCK_REPORTS
+- `USE_REAL_CHAT: false` — flip to use streaming POST /api/chat (BACKEND_URL)
+- `USE_REAL_MAP: false` — flip to use Azure Maps (currently shows placeholder)
+- `SHOW_EMERGENCY: true` — emergency contact button in Signals drawer
+- `SHOW_REPORTS: true` — report-an-incident in Signals drawer
+- `BACKEND_URL = 'https://chicago-pulse.vercel.app'` — update when deployed
+
+## Onboarding Flow
+
+1. App loads → `app/index.tsx` checks AsyncStorage
+2. No profile → `/splash` (dark screen, "Get Started →")
+3. Splash → `/onboarding/step1` (persona + name)
+4. If Student → `/onboarding/step1b` (university + sports toggle)
+5. → `/onboarding/step2` (interests, max 3)
+6. → `/onboarding/step3` (home zone)
+7. → `/onboarding/step4` (safety/emergency/train → saves profile → tabs)
+
+## AI Chat (Harold)
+
+- Mock mode: keyword-matching responses covering safety, food, transit, crowds, events, coffee, weather
+- Real mode (USE_REAL_CHAT=true): streams from POST /api/chat with history + profile
+- Quick prompts personalized by persona (student/commuter/local/visitor)
+- Source chips appear below every Harold message
 
 ## Known Warnings (non-blocking)
 
-- `shadow*` style props deprecated on web → use `boxShadow` (harmless warning)
-- `useNativeDriver` not supported on web → falls back to JS animations (normal)
+- `shadow*` style props deprecated on web → use `boxShadow`
+- `useNativeDriver` not supported on web → JS animation fallback
 - `props.pointerEvents` deprecated → internal React Native web warning

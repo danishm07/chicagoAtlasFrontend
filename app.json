@@ -1,17 +1,17 @@
 {
   "expo": {
-    "name": "Loop Pulse",
-    "slug": "loop-pulse",
+    "name": "Chicago Pulse",
+    "slug": "chicago-pulse",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "looppulse",
+    "scheme": "chicagopulse",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#F7F6F3"
+      "backgroundColor": "#0F0F0F"
     },
     "ios": {
       "supportsTablet": false,
@@ -20,7 +20,7 @@
     "android": {
       "package": "com.looppulse",
       "adaptiveIcon": {
-        "backgroundColor": "#F7F6F3",
+        "backgroundColor": "#0F0F0F",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"

@@ -8,19 +8,22 @@ import React, {
 } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const STORAGE_KEY = "loop_pulse_profile";
+const STORAGE_KEY = "chicago_pulse_profile";
 
 export interface LoopProfile {
   name: string;
   personas: string[];
-  university: string;
+  university?: string;
+  sportsNotifications?: boolean;
+  interests?: string[];
   homeZone: string;
   currentZone: string;
+  safetyAlerts?: boolean;
+  emergencyContact?: { name: string; phone: string } | null;
+  trainAlerts?: boolean;
   onboardedAt: string;
   notifySafety?: boolean;
   notifyEvents?: boolean;
-  emergencyName?: string;
-  emergencyPhone?: string;
 }
 
 interface ProfileContextValue {
@@ -43,6 +46,11 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         const stored = await AsyncStorage.getItem(STORAGE_KEY);
         if (stored) {
           setProfile(JSON.parse(stored));
+        } else {
+          const legacy = await AsyncStorage.getItem("loop_pulse_profile");
+          if (legacy) {
+            setProfile(JSON.parse(legacy));
+          }
         }
       } catch {
         // ignore
@@ -65,6 +73,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
 
   const clearProfile = async () => {
     await AsyncStorage.removeItem(STORAGE_KEY);
+    await AsyncStorage.removeItem("loop_pulse_profile");
     setProfile(null);
   };
 

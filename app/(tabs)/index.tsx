@@ -1,1170 +1,553 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import {
   View,
   Text,
-  ScrollView,
+  TextInput,
   Pressable,
+  FlatList,
+  ScrollView,
   StyleSheet,
   Platform,
   Animated,
-  Dimensions,
-  Modal,
-  Switch,
 } from "react-native";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons, Feather, MaterialIcons } from "@expo/vector-icons";
-import Svg, { Circle } from "react-native-svg";
+import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { useProfile } from "@/context/profile";
 import { router } from "expo-router";
+import { FLAGS, BACKEND_URL } from "@/constants/config";
 
-const { width: SCREEN_W } = Dimensions.get("window");
-const CARD_W = Math.min(SCREEN_W, 375);
+const ZONE_LABELS: Record<string, string> = {
+  north_side: "North Side",
+  near_campus: "Near Campus",
+  loop: "The Loop",
+  south_side: "South Side",
+  west_side: "West Side",
+  gps: "My Location",
+  north: "North Loop",
+  depaul_loop: "DePaul Loop",
+  west: "West Loop",
+  south: "South Loop",
+};
 
-// ─── Animated SVG Ring ────────────────────────────────────────────────────────
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+type Message = {
+  id: string;
+  role: "user" | "ai" | "typing";
+  text: string;
+  sources?: string[];
+  timestamp: Date;
+};
 
-function HealthRing({ score }: { score: number }) {
-  const R = 52;
-  const CIRC = 2 * Math.PI * R;
-  const progress = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.timing(progress, {
-      toValue: score / 100,
-      duration: 1200,
-      useNativeDriver: false,
-    }).start();
-  }, []);
-
-  const strokeDashoffset = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [CIRC, 0],
-  });
-
-  return (
-    <Svg width={120} height={120} style={{ transform: [{ rotate: "-90deg" }] }}>
-      <Circle cx={60} cy={60} r={R} stroke="#FFFFFF14" strokeWidth={8} fill="none" />
-      <AnimatedCircle
-        cx={60}
-        cy={60}
-        r={R}
-        stroke={Colors.accent}
-        strokeWidth={8}
-        fill="none"
-        strokeLinecap="round"
-        strokeDasharray={`${CIRC}`}
-        strokeDashoffset={strokeDashoffset}
-      />
-    </Svg>
-  );
-}
-
-// ─── Shimmer Skeleton ─────────────────────────────────────────────────────────
-function Shimmer({ width, height, radius = 6 }: { width: number | string; height: number; radius?: number }) {
-  const anim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(anim, { toValue: 1, duration: 800, useNativeDriver: false }),
-        Animated.timing(anim, { toValue: 0, duration: 800, useNativeDriver: false }),
-      ])
-    ).start();
-  }, []);
-
-  const bg = anim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["#E8E5DF", "#F0EDE8"],
-  });
-
-  return (
-    <Animated.View
-      style={{ width: width as any, height, borderRadius: radius, backgroundColor: bg }}
-    />
-  );
-}
-
-// ─── Alert Banner ─────────────────────────────────────────────────────────────
-function AlertBanner({
-  message,
-  type,
-  icon,
-  onDismiss,
-}: {
-  message: string;
-  type: "safety" | "event";
-  icon: string;
-  onDismiss: () => void;
-}) {
-  const translateY = useRef(new Animated.Value(-100)).current;
-
-  useEffect(() => {
-    Animated.spring(translateY, {
-      toValue: 0,
-      tension: 80,
-      friction: 12,
-      useNativeDriver: true,
-    }).start();
-
-    const t = setTimeout(() => {
-      Animated.timing(translateY, {
-        toValue: -100,
-        duration: 300,
-        useNativeDriver: true,
-      }).start(onDismiss);
-    }, 8000);
-
-    return () => clearTimeout(t);
-  }, []);
-
-  const dismiss = () => {
-    Animated.timing(translateY, {
-      toValue: -100,
-      duration: 250,
-      useNativeDriver: true,
-    }).start(onDismiss);
+function getMockResponse(input: string): { text: string; sources: string[] } {
+  const q = input.toLowerCase();
+  if (q.includes("safe") || q.includes("walk") || q.includes("danger")) {
+    return {
+      text: "Safety snapshot for your area:\n\n🟢 No active incidents within 0.5 mi\n🟡 Moderate foot traffic on State St\n🟢 CTA lines running normally\n\nOverall: Safe to walk right now.",
+      sources: ["Chicago 311", "CTA Alerts", "CPD Feed"],
+    };
+  }
+  if (q.includes("food") || q.includes("eat") || q.includes("hungry") || q.includes("lunch") || q.includes("dinner")) {
+    return {
+      text: "Best spots near you right now:\n\n🍜 Eleven City Diner — 10 min wait, burgers from $13\n☕ Intelligentsia Coffee — No wait, open late\n🍱 Wow Bao — No wait, everything under $10\n\nAll within a 5 min walk.",
+      sources: ["Yelp Fusion", "Google Maps"],
+    };
+  }
+  if (q.includes("commute") || q.includes("cta") || q.includes("train") || q.includes("delay")) {
+    return {
+      text: "CTA Status right now:\n\n🟢 Red Line — All clear\n🟢 Blue Line — On time\n🟡 Brown Line — 4 min delay at Belmont\n🟢 Green Line — Normal service\n\nNo major delays reported.",
+      sources: ["CTA Alerts", "Transitapp"],
+    };
+  }
+  if (q.includes("busy") || q.includes("crowd") || q.includes("loop")) {
+    return {
+      text: "Chicago Loop density report:\n\n📍 Millennium Park: 3× normal traffic\n📍 State St: Moderate\n📍 Michigan Ave: Busy\n\nBest time to move: after 8 PM.",
+      sources: ["Chicago 311", "Google Density"],
+    };
+  }
+  if (q.includes("event") || q.includes("tonight") || q.includes("do") || q.includes("free")) {
+    return {
+      text: "What I'd do tonight:\n\n🎭 Chicago Cultural Center — Free admission, closing exhibit\n🏀 United Center — Bulls game 7:30PM\n🎵 Andy's Jazz Club — Live set 9PM, $10 cover\n\nAll reachable by CTA in under 20 min.",
+      sources: ["Ticketmaster", "Yelp Fusion", "Chicago 311"],
+    };
+  }
+  if (q.includes("coffee") || q.includes("cafe")) {
+    return {
+      text: "Best coffee near you:\n\n☕ Intelligentsia Coffee — No wait, 0.1 mi\n🟢 Open until 9 PM\n\nSecond floor window seats are usually free on weekday evenings.",
+      sources: ["Yelp Fusion", "Google Maps"],
+    };
+  }
+  if (q.includes("weather") || q.includes("cold") || q.includes("rain") || q.includes("snow")) {
+    return {
+      text: "Chicago weather right now:\n\n🌤️ 34°F · Feels like 27°F\n☁️ Overcast, low chance of precipitation\n💨 Wind: 12 mph from the lake\n\nDress warm — it's a classic Chicago winter day.",
+      sources: ["NWS Chicago", "Weather.gov"],
+    };
+  }
+  return {
+    text: "Here's your Chicago snapshot:\n\n📊 City activity: Moderate\n🎭 4 events happening tonight\n🍽️ 38 spots open nearby\n🚇 CTA: All lines normal\n🌿 AQI: 37 — Good\n\nWhat do you want to dig into?",
+    sources: ["Chicago 311", "Yelp Fusion", "CTA Alerts", "Weather"],
   };
-
-  const bgColor = type === "safety" ? "#C8303A" : "#1C1B18";
-
-  return (
-    <Animated.View
-      style={[
-        styles.banner,
-        { backgroundColor: bgColor, transform: [{ translateY }] },
-      ]}
-    >
-      <View style={styles.bannerLeft}>
-        <Text style={styles.bannerIcon}>{icon}</Text>
-        <Text style={styles.bannerText}>{message}</Text>
-      </View>
-      <Pressable onPress={dismiss} hitSlop={12}>
-        <Feather name="x" size={16} color="#FFFFFF" />
-      </Pressable>
-    </Animated.View>
-  );
 }
 
-// ─── Pulsing Live Dot ─────────────────────────────────────────────────────────
-function LivePill() {
-  const scale = useRef(new Animated.Value(1)).current;
+const QUICK_PROMPTS_BY_PERSONA: Record<string, string[]> = {
+  student: [
+    "What's happening near campus?",
+    "Cheapest food open right now?",
+    "Is it safe to walk tonight?",
+    "Any free events today?",
+  ],
+  commuter: [
+    "How's my commute looking?",
+    "Any CTA delays right now?",
+    "Quick lunch near me under $15?",
+    "Is the Loop busy right now?",
+  ],
+  local: [
+    "What's actually worth doing tonight?",
+    "Any hidden gems open right now?",
+    "What's trending in my neighborhood?",
+    "Best bar with no wait right now?",
+  ],
+  visitor: [
+    "What should I do in Chicago today?",
+    "What's uniquely Chicago right now?",
+    "Is it safe to explore tonight?",
+    "Best neighborhood to walk around?",
+  ],
+};
+
+const DEFAULT_PROMPTS = [
+  "What's happening tonight?",
+  "Is it safe to walk right now?",
+  "Best coffee nearby?",
+  "How's the CTA running?",
+];
+
+function TypingIndicator() {
+  const dot1 = useRef(new Animated.Value(0)).current;
+  const dot2 = useRef(new Animated.Value(0)).current;
+  const dot3 = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(scale, { toValue: 1.4, duration: 600, useNativeDriver: true }),
-        Animated.timing(scale, { toValue: 1, duration: 600, useNativeDriver: true }),
-      ])
-    ).start();
+    const pulse = (dot: Animated.Value, delay: number) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(dot, { toValue: 1, duration: 300, useNativeDriver: true }),
+          Animated.timing(dot, { toValue: 0, duration: 300, useNativeDriver: true }),
+          Animated.delay(600),
+        ])
+      );
+    const a1 = pulse(dot1, 0);
+    const a2 = pulse(dot2, 200);
+    const a3 = pulse(dot3, 400);
+    a1.start(); a2.start(); a3.start();
+    return () => { a1.stop(); a2.stop(); a3.stop(); };
   }, []);
 
   return (
-    <View style={styles.livePill}>
-      <View style={styles.liveDotWrapper}>
-        <Animated.View style={[styles.liveDotRing, { transform: [{ scale }] }]} />
-        <View style={styles.liveDot} />
+    <View style={styles.aiBubbleRow}>
+      <View style={styles.aiBubble}>
+        <View style={styles.typingDots}>
+          {[dot1, dot2, dot3].map((dot, i) => (
+            <Animated.View
+              key={i}
+              style={[
+                styles.typingDot,
+                {
+                  opacity: dot.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }),
+                  transform: [{ translateY: dot.interpolate({ inputRange: [0, 1], outputRange: [0, -4] }) }],
+                },
+              ]}
+            />
+          ))}
+        </View>
       </View>
-      <Text style={styles.liveText}>LIVE</Text>
     </View>
   );
 }
 
-// ─── Stat Mini Card ───────────────────────────────────────────────────────────
-function StatCard({ icon, line1, line2 }: { icon: string; line1: string; line2: string }) {
-  return (
-    <Pressable
-      style={({ pressed }) => [styles.statCard, { opacity: pressed ? 0.8 : 1 }]}
-      onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        // TODO: open bottom sheet with stat detail
-      }}
-    >
-      <Feather name={icon as any} size={14} color="#FFFFFF88" />
-      <Text style={styles.statLine1}>{line1}</Text>
-      <Text style={styles.statLine2}>{line2}</Text>
-    </Pressable>
-  );
-}
-
-// ─── Data Card ────────────────────────────────────────────────────────────────
-type DataCardProps = {
-  icon: string;
-  iconBg: string;
-  value: string;
-  label: string;
-  pillLabel: string;
-  pillColor: string;
-  pillBg: string;
-  isLoading?: boolean;
-  onPress: () => void;
-};
-
-function DataCard({ icon, iconBg, value, label, pillLabel, pillColor, pillBg, isLoading, onPress }: DataCardProps) {
+function LiveDot() {
   const scale = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(scale, { toValue: 1.6, duration: 700, useNativeDriver: true }),
+        Animated.timing(scale, { toValue: 1, duration: 700, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
+  return (
+    <View style={styles.liveDotWrapper}>
+      <Animated.View style={[styles.liveDotRing, { transform: [{ scale }] }]} />
+      <View style={styles.liveDot} />
+    </View>
+  );
+}
 
-  const handlePress = () => {
-    Animated.sequence([
-      Animated.timing(scale, { toValue: 0.97, duration: 80, useNativeDriver: true }),
-      Animated.timing(scale, { toValue: 1, duration: 120, useNativeDriver: true }),
-    ]).start();
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onPress();
-  };
-
-  if (isLoading) {
-    return (
-      <View style={styles.dataCard}>
-        <Shimmer width={32} height={32} radius={10} />
-        <Shimmer width={40} height={28} radius={6} />
-        <Shimmer width="80%" height={12} radius={4} />
-        <Shimmer width={60} height={20} radius={10} />
-      </View>
-    );
-  }
+function MessageBubble({ msg }: { msg: Message }) {
+  const isUser = msg.role === "user";
+  const timeStr = msg.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  if (msg.role === "typing") return <TypingIndicator />;
 
   return (
-    <Pressable onPress={handlePress}>
-      <Animated.View style={[styles.dataCard, { transform: [{ scale }] }]}>
-        <View style={[styles.dataIconCircle, { backgroundColor: iconBg }]}>
-          <Ionicons name={icon as any} size={16} color="#FFFFFF" />
+    <View style={[styles.messageRow, isUser ? styles.messageRowUser : styles.messageRowAI]}>
+      {isUser ? (
+        <View style={styles.userBubble}>
+          <Text style={styles.userText}>{msg.text}</Text>
+          <Text style={[styles.timestamp, styles.timestampUser]}>{timeStr}</Text>
         </View>
-        <Text style={styles.dataValue}>{value}</Text>
-        <Text style={styles.dataLabel}>{label}</Text>
-        <View style={[styles.dataPill, { backgroundColor: pillBg }]}>
-          <Text style={[styles.dataPillText, { color: pillColor }]}>{pillLabel}</Text>
+      ) : (
+        <View style={styles.aiGroup}>
+          <View style={styles.aiBubble}>
+            <Text style={styles.aiText}>{msg.text}</Text>
+          </View>
+          {msg.sources && msg.sources.length > 0 && (
+            <View style={styles.sourcesRow}>
+              {msg.sources.map((src) => (
+                <View key={src} style={styles.sourceChip}>
+                  <Text style={styles.sourceChipText}>{src}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+          <Text style={[styles.timestamp, styles.timestampAI]}>{timeStr}</Text>
         </View>
-      </Animated.View>
-    </Pressable>
+      )}
+    </View>
   );
 }
 
-// ─── Trending Chip ────────────────────────────────────────────────────────────
-function TrendingChip({ tag, name, meta }: { tag: string; name: string; meta: string }) {
-  return (
-    <Pressable
-      style={({ pressed }) => [styles.trendChip, { opacity: pressed ? 0.8 : 1 }]}
-      onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        // TODO: open trending item detail
-      }}
-    >
-      <Text style={styles.trendTag}>{tag}</Text>
-      <Text style={styles.trendName}>{name}</Text>
-      <View style={styles.trendMetaRow}>
-        <Text style={styles.trendMeta}>{meta}</Text>
-      </View>
-    </Pressable>
-  );
-}
+const makeId = () => Date.now().toString() + Math.random().toString(36).substr(2, 6);
 
-// ─── Alert Row ────────────────────────────────────────────────────────────────
-function AlertRow({ color, text, time }: { color: string; text: string; time: string }) {
-  return (
-    <Pressable
-      style={({ pressed }) => [styles.alertRow, { opacity: pressed ? 0.75 : 1 }]}
-      onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        // TODO: open alert detail
-      }}
-    >
-      <View style={[styles.alertDot, { backgroundColor: color }]} />
-      <Text style={styles.alertText} numberOfLines={1}>{text}</Text>
-      <Text style={styles.alertTime}>{time}</Text>
-      <Feather name="info" size={14} color={Colors.textTertiary} />
-    </Pressable>
-  );
-}
-
-// ─── Main Screen ──────────────────────────────────────────────────────────────
-export default function PulseScreen() {
+export default function AskScreen() {
   const insets = useSafeAreaInsets();
-  const { profile, clearProfile, updateProfile } = useProfile();
-  const [showBanner, setShowBanner] = useState(true);
-  const [showSettings, setShowSettings] = useState(false);
-  const [notifySafety, setNotifySafety] = useState(profile?.notifySafety ?? true);
-  const [notifyEvents, setNotifyEvents] = useState(profile?.notifyEvents ?? true);
-  const [loading] = useState(false);
-  const topPad = Platform.OS === "web" ? 67 : insets.top;
-  const bottomPad = Platform.OS === "web" ? 84 : insets.bottom + 72;
+  const { profile } = useProfile();
+  const [input, setInput] = useState("");
+  const [isSending, setIsSending] = useState(false);
+  const inputRef = useRef<TextInput>(null);
 
-  const hour = new Date().getHours();
-  const greeting =
-    hour < 12 ? "Good morning," : hour < 17 ? "Good afternoon," : "Good evening,";
+  const topPad = Platform.OS === "web" ? 67 : insets.top;
+  const bottomPad = Platform.OS === "web" ? 84 : insets.bottom + 80;
 
   const displayName = profile?.name || "there";
-  const zoneName = profile?.homeZone
-    ? profile.homeZone.split("_").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
-    : "The Loop";
+  const zone = ZONE_LABELS[profile?.homeZone ?? ""] ?? "Chicago";
+  const firstPersona = profile?.personas?.[0] ?? "visitor";
+  const persona = firstPersona.charAt(0).toUpperCase() + firstPersona.slice(1);
+
+  const quickPrompts = QUICK_PROMPTS_BY_PERSONA[firstPersona] ?? DEFAULT_PROMPTS;
+
+  const openingMessage: Message = {
+    id: "opening",
+    role: "ai",
+    text: `Hey ${displayName} 👋\nI'm plugged into live Chicago data right now — what do you want to know?`,
+    sources: ["Chicago 311", "Yelp", "CTA", "Weather"],
+    timestamp: new Date(Date.now() - 180000),
+  };
+
+  const [messages, setMessages] = useState<Message[]>([openingMessage]);
+  const messagesRef = useRef(messages);
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
+
+  const handleSend = useCallback(
+    (text?: string) => {
+      const msg = (text ?? input).trim();
+      if (!msg || isSending) return;
+
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setInput("");
+      setIsSending(true);
+
+      const userMsg: Message = { id: makeId(), role: "user", text: msg, timestamp: new Date() };
+      const typingMsg: Message = { id: "typing", role: "typing", text: "", timestamp: new Date() };
+
+      setMessages((prev) => [typingMsg, userMsg, ...prev]);
+
+      if (FLAGS.USE_REAL_CHAT) {
+        const history = messagesRef.current.slice(0, 6).map((m) => ({
+          role: m.role === "ai" ? "assistant" : "user",
+          content: m.text,
+        }));
+        let fullText = "";
+        const aiMsgId = makeId();
+
+        (async () => {
+          try {
+            const response = await fetch(BACKEND_URL + "/api/chat", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ message: msg, history, profile }),
+            });
+            const reader = response.body!.getReader();
+            const decoder = new TextDecoder();
+
+            const streamingMsg: Message = {
+              id: aiMsgId,
+              role: "ai",
+              text: "",
+              sources: [],
+              timestamp: new Date(),
+            };
+            setMessages((prev) => [streamingMsg, ...prev.filter((m) => m.id !== "typing")]);
+
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              fullText += decoder.decode(value);
+              setMessages((prev) =>
+                prev.map((m) => m.id === aiMsgId ? { ...m, text: fullText } : m)
+              );
+            }
+
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === aiMsgId
+                  ? { ...m, text: fullText, sources: ["Chicago 311", "Yelp", "CTA"] }
+                  : m
+              )
+            );
+          } catch {
+            const errMsg: Message = {
+              id: makeId(),
+              role: "ai",
+              text: "I couldn't reach live data right now. Try again in a moment.",
+              sources: [],
+              timestamp: new Date(),
+            };
+            setMessages((prev) => [errMsg, ...prev.filter((m) => m.id !== "typing" && m.id !== aiMsgId)]);
+          } finally {
+            setIsSending(false);
+            inputRef.current?.focus();
+          }
+        })();
+      } else {
+        setTimeout(() => {
+          const { text: responseText, sources } = getMockResponse(msg);
+          const aiMsg: Message = { id: makeId(), role: "ai", text: responseText, sources, timestamp: new Date() };
+          setMessages((prev) => [aiMsg, ...prev.filter((m) => m.id !== "typing")]);
+          setIsSending(false);
+          inputRef.current?.focus();
+        }, 1400);
+      }
+    },
+    [input, isSending, profile]
+  );
 
   return (
-    <View style={[styles.root, { paddingTop: topPad }]}>
-      {/* Alert Banner */}
-      {showBanner && (
-        <AlertBanner
-          message="DePaul vs Marquette starts in 60 min →"
-          type="event"
-          icon="🏀"
-          onDismiss={() => setShowBanner(false)}
-        />
-      )}
-
-      {/* ── Header ── */}
+    <KeyboardAvoidingView
+      style={[styles.root, { paddingTop: topPad }]}
+      behavior="padding"
+      keyboardVerticalOffset={0}
+    >
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Text style={styles.headerGreeting}>{greeting}</Text>
-          <Text style={styles.headerName}>{displayName}</Text>
-          <Pressable
-            style={styles.zonePill}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              // TODO: open zone picker
-            }}
-          >
-            <Feather name="map-pin" size={11} color={Colors.accent} />
-            <Text style={styles.zonePillText}>{zoneName}</Text>
-            <Feather name="chevron-right" size={11} color={Colors.textTertiary} />
-          </Pressable>
+          <View style={styles.headerAvatar}>
+            <Text style={styles.headerAvatarText}>H</Text>
+          </View>
+          <View style={styles.headerCenter}>
+            <Text style={styles.headerTitle}>Harold</Text>
+            <View style={styles.headerStatusRow}>
+              <LiveDot />
+              <Text style={styles.headerStatus}>Connected to live Chicago data</Text>
+            </View>
+          </View>
         </View>
-        <View style={styles.headerRight}>
-          <Pressable
-            style={styles.iconBtn}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              // TODO: open saved panel
-            }}
-          >
-            <Feather name="bookmark" size={20} color={Colors.textPrimary} />
-          </Pressable>
-          <Pressable
-            style={styles.iconBtn}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setShowSettings(true);
-            }}
-          >
-            <Feather name="settings" size={20} color={Colors.textPrimary} />
-          </Pressable>
-          <LivePill />
+        <Pressable style={styles.settingsBtn} onPress={() => router.push("/settings")}>
+          <Ionicons name="settings-outline" size={22} color={Colors.textSecondary} />
+        </Pressable>
+      </View>
+
+      <View style={styles.contextRow}>
+        <View style={styles.contextPill}>
+          <Text style={styles.contextText}>
+            📍 {zone} · {persona} · 4 sources active
+          </Text>
         </View>
       </View>
 
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={{ paddingBottom: bottomPad }}
+      <FlatList
+        data={messages}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => <MessageBubble msg={item} />}
+        inverted
+        contentContainerStyle={styles.messageList}
+        keyboardDismissMode="interactive"
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
-      >
-        {/* ── Pulse Hero Card ── */}
-        <View style={styles.section}>
-          <View style={styles.heroCard}>
-            {/* Subtle glow */}
-            <View style={styles.heroGlow} />
+      />
 
-            <Text style={styles.heroLabel}>{"// LOOP HEALTH SCORE"}</Text>
-
-            <View style={styles.heroRingRow}>
-              <View style={styles.heroRingWrapper}>
-                <HealthRing score={87} />
-                <View style={styles.heroScoreCenter}>
-                  <Text style={styles.heroScore}>87</Text>
-                </View>
-              </View>
-              <View style={styles.heroRightCol}>
-                <View style={styles.heroStatusRow}>
-                  <View style={styles.heroStatusDot} />
-                  <Text style={styles.heroStatus}>Moderately Busy</Text>
-                </View>
-                <View style={styles.heroStatCards}>
-                  <StatCard icon="trending-up" line1="Past 30 Min" line2="↑ Trending Up" />
-                  <StatCard icon="users" line1="Density" line2="Moderate" />
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.heroFooter}>
-              <Text style={styles.heroUpdated}>Updated 2 min ago</Text>
-              <Pressable
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  // TODO: refresh data
-                }}
-              >
-                <Feather name="refresh-cw" size={13} color="#FFFFFF66" />
-              </Pressable>
-            </View>
-          </View>
-        </View>
-
-        {/* ── Data Cards Grid ── */}
-        <View style={styles.section}>
-          <View style={styles.grid}>
-            <DataCard
-              icon="shield-checkmark"
-              iconBg={Colors.success}
-              value="2"
-              label="Nearby Incidents"
-              pillLabel="Low Risk"
-              pillColor={Colors.success}
-              pillBg={Colors.successBg}
-              isLoading={loading}
-              onPress={() => {
-                // TODO: open safety detail
-              }}
-            />
-            <DataCard
-              icon="ticket"
-              iconBg="#3B82F6"
-              value="4"
-              label="Today's Events"
-              pillLabel="View All"
-              pillColor="#3B82F6"
-              pillBg="#EFF6FF"
-              isLoading={loading}
-              onPress={() => {
-                // TODO: open events list
-              }}
-            />
-            <DataCard
-              icon="restaurant"
-              iconBg={Colors.accent}
-              value="38"
-              label="Open Nearby"
-              pillLabel="Active"
-              pillColor={Colors.success}
-              pillBg={Colors.successBg}
-              isLoading={loading}
-              onPress={() => {
-                // TODO: open spots list
-              }}
-            />
-            <DataCard
-              icon="leaf"
-              iconBg={Colors.success}
-              value="52"
-              label="AQI — Good"
-              pillLabel="Safe"
-              pillColor={Colors.success}
-              pillBg={Colors.successBg}
-              isLoading={loading}
-              onPress={() => {
-                // TODO: open air quality detail
-              }}
-            />
-          </View>
-        </View>
-
-        {/* ── Game Day Card ── */}
-        {true /* hasGame */ && (
-          <View style={styles.section}>
-            <Pressable
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                // TODO: open game day detail / ticket link
-              }}
-              style={({ pressed }) => [styles.gameCard, { opacity: pressed ? 0.9 : 1 }]}
-            >
-              <View style={styles.gameCardInner}>
-                <View style={styles.gameLeft}>
-                  <View style={styles.gameIconCircle}>
-                    <Ionicons name="basketball" size={22} color="#FFFFFF" />
-                  </View>
-                  <View style={styles.gameTextCol}>
-                    <Text style={styles.gameTitle}>DePaul vs Marquette</Text>
-                    <Text style={styles.gameMeta}>Tonight 7:00 PM</Text>
-                    <Text style={styles.gameVenue}>Wintrust Arena · 0.8 mi</Text>
-                  </View>
-                </View>
-                <View style={styles.gameRight}>
-                  <View style={styles.gameTicketPill}>
-                    <Text style={styles.gameTicketText}>From $18</Text>
-                  </View>
-                  <Text style={styles.gameTicketLink}>Get Tickets</Text>
-                </View>
-              </View>
-              <View style={styles.gameFooter}>
-                <Feather name="alert-triangle" size={12} color="#FFFFFF99" />
-                <Text style={styles.gameFooterText}>Wabash Ave busy post-game</Text>
-              </View>
-            </Pressable>
-          </View>
-        )}
-
-        {/* ── Trending Now ── */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Trending Now</Text>
-          <Pressable
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              // TODO: navigate to full trending list
-            }}
-          >
-            <Text style={styles.viewAll}>View All</Text>
-          </Pressable>
-        </View>
+      <View style={styles.quickArea}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.trendScroll}
+          contentContainerStyle={styles.quickScroll}
+          keyboardShouldPersistTaps="handled"
         >
-          <TrendingChip tag="BUSY" name="Millennium Park" meta="↑ 3× normal traffic" />
-          <TrendingChip tag="TONIGHT" name="Symphony Center" meta="Doors 6:30PM · ~2,500" />
-          <TrendingChip tag="TRENDING" name="Gyu-Kaku Loop" meta="Mentioned 47× today" />
-          <TrendingChip tag="SPORTS" name="DePaul vs Marquette" meta="Tonight · Wintrust" />
+          {quickPrompts.map((qp) => (
+            <Pressable
+              key={qp}
+              style={({ pressed }) => [
+                styles.quickChip,
+                { backgroundColor: pressed ? "#FEF0ED" : Colors.surface },
+              ]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                handleSend(qp);
+              }}
+            >
+              <Text style={styles.quickChipText}>{qp}</Text>
+            </Pressable>
+          ))}
         </ScrollView>
+      </View>
 
-        {/* ── Active Alerts ── */}
-        <View style={[styles.sectionHeader, { marginTop: 8 }]}>
-          <Text style={styles.sectionTitle}>Active Alerts</Text>
-        </View>
-        <View style={[styles.section, { marginTop: 0 }]}>
-          <View style={styles.alertsCard}>
-            <AlertRow color="#F59E0B" text="Traffic blocked on State St" time="Just now" />
-            <View style={styles.alertDivider} />
-            <AlertRow color={Colors.success} text="Noise complaint near DePaul" time="2 min ago" />
-            <View style={styles.alertDivider} />
-            <AlertRow color={Colors.danger} text="Fire alarm on Wabash" time="5 min ago" />
-          </View>
-        </View>
-
-        {/* ── Chat Preview ── */}
-        <View style={styles.section}>
-          <Pressable
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push("/(tabs)/chat");
-            }}
-            style={({ pressed }) => [styles.chatCard, { opacity: pressed ? 0.85 : 1 }]}
-          >
-            <View style={styles.chatIconBox}>
-              <MaterialIcons name="diamond" size={20} color={Colors.accent} />
-            </View>
-            <View style={styles.chatCenter}>
-              <Text style={styles.chatPrompt}>
-                "What should I do near DePaul tonight?"
-              </Text>
-              <Text style={styles.chatHint}>Tap to ask the Loop →</Text>
-            </View>
-            <Feather name="arrow-right" size={18} color={Colors.accent} />
-          </Pressable>
-        </View>
-      </ScrollView>
-
-      {/* ── Settings Modal ── */}
-      <Modal
-        visible={showSettings}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowSettings(false)}
-      >
-        <Pressable
-          style={styles.modalBackdrop}
-          onPress={() => setShowSettings(false)}
+      <View style={[styles.inputRow, { paddingBottom: bottomPad }]}>
+        <TextInput
+          ref={inputRef}
+          style={styles.textInput}
+          placeholder="Ask Harold anything..."
+          placeholderTextColor={Colors.textTertiary}
+          value={input}
+          onChangeText={setInput}
+          onSubmitEditing={() => handleSend()}
+          returnKeyType="send"
+          blurOnSubmit={false}
+          multiline={false}
         />
-        <View style={[styles.modalSheet, { paddingBottom: insets.bottom + 24 }]}>
-          <View style={styles.modalHandle} />
-          <Text style={styles.modalTitle}>Settings</Text>
-
-          {/* Notification toggles */}
-          <Text style={styles.settingsSectionLabel}>Notifications</Text>
-          <View style={styles.notifCard}>
-            <View style={styles.notifRow}>
-              <View style={styles.notifText}>
-                <Text style={styles.notifLabel}>Safety Alerts</Text>
-                <Text style={styles.notifDesc}>Incidents, blocked streets, emergencies</Text>
-              </View>
-              <Switch
-                value={notifySafety}
-                onValueChange={(v) => {
-                  setNotifySafety(v);
-                  updateProfile({ notifySafety: v });
-                }}
-                trackColor={{ false: "#E8E5DF", true: Colors.accent }}
-                thumbColor="#FFFFFF"
-              />
-            </View>
-            <View style={styles.notifDivider} />
-            <View style={styles.notifRow}>
-              <View style={styles.notifText}>
-                <Text style={styles.notifLabel}>Sports & Events</Text>
-                <Text style={styles.notifDesc}>Game starts, show doors, event reminders</Text>
-              </View>
-              <Switch
-                value={notifyEvents}
-                onValueChange={(v) => {
-                  setNotifyEvents(v);
-                  updateProfile({ notifyEvents: v });
-                }}
-                trackColor={{ false: "#E8E5DF", true: Colors.accent }}
-                thumbColor="#FFFFFF"
-              />
-            </View>
-          </View>
-
-          <Pressable
-            style={({ pressed }) => [
-              styles.resetBtn,
-              { opacity: pressed ? 0.8 : 1 },
-            ]}
-            onPress={async () => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              setShowSettings(false);
-              await clearProfile();
-              router.replace("/onboarding/step1");
-            }}
-          >
-            <Feather name="refresh-ccw" size={18} color="#FFFFFF" />
-            <Text style={styles.resetBtnText}>Reset Account</Text>
-          </Pressable>
-
-          <Pressable
-            style={({ pressed }) => [
-              styles.cancelBtn,
-              { opacity: pressed ? 0.7 : 1 },
-            ]}
-            onPress={() => setShowSettings(false)}
-          >
-            <Text style={styles.cancelBtnText}>Cancel</Text>
-          </Pressable>
-        </View>
-      </Modal>
-    </View>
+        <Pressable
+          style={({ pressed }) => [
+            styles.sendBtn,
+            {
+              backgroundColor:
+                input.trim().length > 0
+                  ? pressed
+                    ? Colors.accent
+                    : Colors.textPrimary
+                  : Colors.border,
+            },
+          ]}
+          onPress={() => handleSend()}
+          disabled={isSending}
+        >
+          <Ionicons
+            name="arrow-up"
+            size={18}
+            color={input.trim().length > 0 ? "#FFFFFF" : Colors.textTertiary}
+          />
+        </Pressable>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.background },
 
-  // Banner
-  banner: {
-    position: "absolute",
-    top: 54,
-    left: 12,
-    right: 12,
-    zIndex: 100,
-    borderRadius: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-  },
-  bannerLeft: { flexDirection: "row", alignItems: "center", gap: 10, flex: 1 },
-  bannerIcon: { fontSize: 16 },
-  bannerText: {
-    fontFamily: "DMSans_500Medium",
-    fontSize: 13,
-    color: "#FFFFFF",
-    flex: 1,
-  },
-
-  // Header
   header: {
     flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 12,
+    paddingVertical: 12,
+    backgroundColor: Colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
+    justifyContent: "space-between",
   },
-  headerLeft: { gap: 4 },
-  headerGreeting: {
-    fontFamily: "DMSans_400Regular",
-    fontSize: 13,
-    color: Colors.textSecondary,
-  },
-  headerName: {
-    fontFamily: "DMSans_700Bold",
-    fontSize: 24,
-    color: Colors.textPrimary,
-    letterSpacing: -0.5,
-  },
-  zonePill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    backgroundColor: "#FEF0ED",
-    borderRadius: 20,
-    alignSelf: "flex-start",
-    marginTop: 4,
-  },
-  zonePillText: {
-    fontFamily: "DMMono_400Regular",
-    fontSize: 11,
-    color: Colors.accent,
-    letterSpacing: 0.3,
-  },
-  headerRight: { flexDirection: "row", alignItems: "center", gap: 6, paddingTop: 4 },
-  iconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
+  headerLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
+  headerAvatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: Colors.accent,
     alignItems: "center",
     justifyContent: "center",
   },
-  livePill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: Colors.successBg,
-    borderRadius: 20,
-  },
-  liveDotWrapper: { width: 8, height: 8, alignItems: "center", justifyContent: "center" },
+  headerAvatarText: { fontSize: 20, fontWeight: "700", color: "#FFFFFF" },
+  headerCenter: { gap: 2 },
+  headerTitle: { fontSize: 15, fontWeight: "700", color: Colors.textPrimary, letterSpacing: -0.2 },
+  headerStatusRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  liveDotWrapper: { width: 10, height: 10, alignItems: "center", justifyContent: "center" },
   liveDotRing: {
     position: "absolute",
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: Colors.success,
-    opacity: 0.4,
+    width: 10, height: 10, borderRadius: 5,
+    backgroundColor: Colors.success, opacity: 0.35,
   },
   liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.success },
-  liveText: {
-    fontFamily: "DMMono_500Medium",
-    fontSize: 10,
-    color: Colors.success,
-    letterSpacing: 1,
-  },
+  headerStatus: { fontSize: 10, color: Colors.success },
+  settingsBtn: { padding: 6 },
 
-  scroll: { flex: 1 },
+  contextRow: { paddingHorizontal: 16, paddingVertical: 8, alignItems: "center" },
+  contextPill: {
+    paddingHorizontal: 12, paddingVertical: 6,
+    backgroundColor: "#F0EEE9", borderRadius: 20,
+  },
+  contextText: { fontSize: 11, color: Colors.textTertiary },
 
-  section: { paddingHorizontal: 20, marginTop: 16 },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    marginTop: 20,
-    marginBottom: 10,
-  },
-  sectionTitle: {
-    fontFamily: "DMSans_700Bold",
-    fontSize: 17,
-    color: Colors.textPrimary,
-    letterSpacing: -0.3,
-  },
-  viewAll: {
-    fontFamily: "DMSans_500Medium",
-    fontSize: 13,
-    color: Colors.accent,
-  },
+  messageList: { paddingHorizontal: 16, paddingVertical: 8, gap: 12 },
+  messageRow: { flexDirection: "row" },
+  messageRowUser: { justifyContent: "flex-end" },
+  messageRowAI: { justifyContent: "flex-start" },
 
-  // Hero Card
-  heroCard: {
+  userBubble: {
+    maxWidth: "78%",
     backgroundColor: Colors.textPrimary,
-    borderRadius: 24,
-    padding: 20,
-    overflow: "hidden",
+    borderRadius: 16, borderBottomRightRadius: 4,
+    padding: 14, gap: 4,
   },
-  heroGlow: {
-    position: "absolute",
-    top: -40,
-    right: -40,
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    backgroundColor: "rgba(232,83,58,0.12)",
-  },
-  heroLabel: {
-    fontFamily: "DMMono_400Regular",
-    fontSize: 10,
-    color: "#FFFFFF55",
-    letterSpacing: 0.8,
-    marginBottom: 16,
-  },
-  heroRingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 20,
-  },
-  heroRingWrapper: {
-    width: 120,
-    height: 120,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  heroScoreCenter: {
-    position: "absolute",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  heroScore: {
-    fontFamily: "DMSans_700Bold",
-    fontSize: 52,
-    color: "#FFFFFF",
-    letterSpacing: -2,
-  },
-  heroRightCol: { flex: 1, gap: 12 },
-  heroStatusRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  heroStatusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.accent,
-  },
-  heroStatus: {
-    fontFamily: "DMSans_600SemiBold",
-    fontSize: 14,
-    color: "#FFFFFFCC",
-  },
-  heroStatCards: { gap: 8 },
-  statCard: {
-    backgroundColor: "#FFFFFF12",
-    borderRadius: 10,
-    padding: 10,
-    gap: 3,
-  },
-  statLine1: {
-    fontFamily: "DMMono_400Regular",
-    fontSize: 10,
-    color: "#FFFFFF66",
-    letterSpacing: 0.3,
-  },
-  statLine2: {
-    fontFamily: "DMSans_600SemiBold",
-    fontSize: 13,
-    color: "#FFFFFF",
-  },
-  heroFooter: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 16,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#FFFFFF14",
-  },
-  heroUpdated: {
-    fontFamily: "DMMono_400Regular",
-    fontSize: 10,
-    color: "#FFFFFF44",
-    letterSpacing: 0.3,
-  },
+  userText: { fontSize: 14, color: "#FFFFFF", lineHeight: 20 },
 
-  // Data Grid
-  grid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-  dataCard: {
-    width: (Math.min(SCREEN_W, 375) - 40 - 10) / 2,
+  aiGroup: { maxWidth: "82%", gap: 6 },
+  aiBubbleRow: { flexDirection: "row", justifyContent: "flex-start" },
+  aiBubble: {
     backgroundColor: Colors.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    padding: 16,
-    gap: 6,
-  },
-  dataIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  dataValue: {
-    fontFamily: "DMSans_700Bold",
-    fontSize: 28,
-    color: Colors.textPrimary,
-    letterSpacing: -1,
-    marginTop: 4,
-  },
-  dataLabel: {
-    fontFamily: "DMMono_400Regular",
-    fontSize: 11,
-    color: Colors.textSecondary,
-    letterSpacing: 0.2,
-  },
-  dataPill: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 20,
-    marginTop: 4,
-  },
-  dataPillText: {
-    fontFamily: "DMSans_600SemiBold",
-    fontSize: 11,
-  },
-
-  // Game Card
-  gameCard: {
-    backgroundColor: Colors.depaul,
-    borderRadius: 16,
-    padding: 16,
-    overflow: "hidden",
-  },
-  gameCardInner: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  gameLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
-  gameIconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: "#FFFFFF20",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  gameTextCol: { gap: 2 },
-  gameTitle: {
-    fontFamily: "DMSans_700Bold",
-    fontSize: 15,
-    color: "#FFFFFF",
-    letterSpacing: -0.3,
-  },
-  gameMeta: {
-    fontFamily: "DMMono_400Regular",
-    fontSize: 11,
-    color: "#FFFFFFBB",
-  },
-  gameVenue: {
-    fontFamily: "DMMono_400Regular",
-    fontSize: 11,
-    color: "#FFFFFF88",
-  },
-  gameRight: { alignItems: "flex-end", gap: 4 },
-  gameTicketPill: {
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 20,
-  },
-  gameTicketText: {
-    fontFamily: "DMSans_700Bold",
-    fontSize: 12,
-    color: Colors.depaul,
-  },
-  gameTicketLink: {
-    fontFamily: "DMSans_500Medium",
-    fontSize: 11,
-    color: "#FFFFFFCC",
-  },
-  gameFooter: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginTop: 12,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: "#FFFFFF22",
-  },
-  gameFooterText: {
-    fontFamily: "DMMono_400Regular",
-    fontSize: 11,
-    color: "#FFFFFF99",
-  },
-
-  // Trending
-  trendScroll: {
-    paddingLeft: 20,
-    paddingRight: 8,
-    gap: 10,
-  },
-  trendChip: {
-    width: 150,
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    borderRadius: 16, borderBottomLeftRadius: 4,
     padding: 14,
-    gap: 4,
+    borderWidth: 1, borderColor: Colors.border,
   },
-  trendTag: {
-    fontFamily: "DMMono_400Regular",
-    fontSize: 9,
-    color: Colors.textTertiary,
-    letterSpacing: 1.2,
-    textTransform: "uppercase",
-  },
-  trendName: {
-    fontFamily: "DMSans_700Bold",
-    fontSize: 13,
-    color: Colors.textPrimary,
-    letterSpacing: -0.2,
-  },
-  trendMetaRow: { marginTop: 4 },
-  trendMeta: {
-    fontFamily: "DMMono_400Regular",
-    fontSize: 11,
-    color: Colors.textSecondary,
-  },
+  aiText: { fontSize: 14, color: Colors.textPrimary, lineHeight: 22 },
 
-  // Alerts
-  alertsCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    overflow: "hidden",
+  sourcesRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  sourceChip: {
+    paddingHorizontal: 8, paddingVertical: 4,
+    backgroundColor: "#F0EEE9", borderRadius: 6,
   },
-  alertRow: {
+  sourceChipText: { fontSize: 10, color: Colors.textSecondary },
+
+  timestamp: { fontSize: 10, color: Colors.textTertiary },
+  timestampUser: { textAlign: "right" },
+  timestampAI: { textAlign: "left" },
+
+  typingDots: { flexDirection: "row", gap: 4, alignItems: "center", paddingHorizontal: 4, paddingVertical: 2 },
+  typingDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.textTertiary },
+
+  quickArea: {
+    borderTopWidth: 1, borderTopColor: Colors.border,
+    paddingVertical: 10, backgroundColor: Colors.background,
+  },
+  quickScroll: { paddingHorizontal: 16, gap: 8 },
+  quickChip: {
+    paddingHorizontal: 14, paddingVertical: 8,
+    borderRadius: 20, borderWidth: 1.5, borderColor: Colors.border,
+  },
+  quickChipText: { fontSize: 13, color: Colors.textSecondary },
+
+  inputRow: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingTop: 10,
     gap: 10,
-  },
-  alertDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  alertText: {
-    fontFamily: "DMSans_500Medium",
-    fontSize: 13,
-    color: Colors.textPrimary,
-    flex: 1,
-  },
-  alertTime: {
-    fontFamily: "DMMono_400Regular",
-    fontSize: 10,
-    color: Colors.textTertiary,
-  },
-  alertDivider: {
-    height: 1,
-    backgroundColor: Colors.border,
-    marginLeft: 16,
-  },
-
-  // Chat Preview
-  chatCard: {
     backgroundColor: Colors.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderLeftWidth: 3,
-    borderLeftColor: Colors.accent,
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
-    gap: 12,
+    borderTopWidth: 1, borderTopColor: Colors.border,
   },
-  chatIconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: Colors.textPrimary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  chatCenter: { flex: 1, gap: 4 },
-  chatPrompt: {
-    fontFamily: "DMSans_400Regular",
-    fontSize: 13,
-    color: Colors.textSecondary,
-    fontStyle: "italic",
-    lineHeight: 18,
-  },
-  chatHint: {
-    fontFamily: "DMMono_400Regular",
-    fontSize: 11,
-    color: Colors.textTertiary,
-  },
-
-  // Notification card (in settings modal and step2)
-  notifCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    overflow: "hidden",
-    marginBottom: 4,
-  },
-  notifRow: {
-    flexDirection: "row",
-    alignItems: "center",
+  textInput: {
+    flex: 1, height: 44,
+    backgroundColor: Colors.background,
+    borderRadius: 22,
+    borderWidth: 1.5, borderColor: Colors.border,
     paddingHorizontal: 16,
-    paddingVertical: 14,
-    gap: 12,
+    fontSize: 14, color: Colors.textPrimary,
   },
-  notifText: { flex: 1, gap: 2 },
-  notifLabel: {
-    fontFamily: "DMSans_600SemiBold",
-    fontSize: 14,
-    color: Colors.textPrimary,
-  },
-  notifDesc: {
-    fontFamily: "DMMono_400Regular",
-    fontSize: 10,
-    color: Colors.textTertiary,
-    letterSpacing: 0.2,
-  },
-  notifDivider: {
-    height: 1,
-    backgroundColor: Colors.border,
-    marginLeft: 16,
-  },
-  settingsSectionLabel: {
-    fontFamily: "DMSans_600SemiBold",
-    fontSize: 13,
-    color: Colors.textSecondary,
-    marginBottom: 8,
-    marginTop: 4,
-  },
-
-  // Settings modal
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "#00000055",
-  },
-  modalSheet: {
-    backgroundColor: Colors.surface,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    gap: 12,
-  },
-  modalHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: Colors.border,
-    alignSelf: "center",
-    marginBottom: 8,
-  },
-  modalTitle: {
-    fontFamily: "DMSans_700Bold",
-    fontSize: 20,
-    color: Colors.textPrimary,
-    letterSpacing: -0.4,
-    marginBottom: 8,
-  },
-  resetBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    backgroundColor: Colors.accent,
-    borderRadius: 14,
-    paddingVertical: 16,
-  },
-  resetBtnText: {
-    fontFamily: "DMSans_600SemiBold",
-    fontSize: 16,
-    color: "#FFFFFF",
-  },
-  cancelBtn: {
-    alignItems: "center",
-    paddingVertical: 14,
-  },
-  cancelBtnText: {
-    fontFamily: "DMSans_500Medium",
-    fontSize: 15,
-    color: Colors.textSecondary,
-  },
+  sendBtn: { width: 42, height: 42, borderRadius: 21, alignItems: "center", justifyContent: "center" },
 });
