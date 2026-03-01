@@ -23,6 +23,32 @@ export default function SettingsScreen() {
   const C = useColors();
   const [resetModalVisible, setResetModalVisible] = useState(false);
 
+  // Emergency contact — state and logic kept intact, hidden from UI per product decision
+  // Keys: emergencyName, emergencyPhone stored in profile.emergencyContact via AsyncStorage
+  const [emergencyModalVisible, setEmergencyModalVisible] = useState(false);
+  const [emergencyNameInput, setEmergencyNameInput] = useState(
+    profile?.emergencyContact?.name ?? ""
+  );
+  const [emergencyPhoneInput, setEmergencyPhoneInput] = useState(
+    profile?.emergencyContact?.phone ?? ""
+  );
+  const saveEmergencyContact = async () => {
+    if (emergencyNameInput.trim()) {
+      await updateProfile({
+        emergencyContact: { name: emergencyNameInput.trim(), phone: emergencyPhoneInput.trim() },
+      });
+    } else {
+      await updateProfile({ emergencyContact: null });
+    }
+    setEmergencyModalVisible(false);
+  };
+  const clearEmergencyContact = async () => {
+    setEmergencyNameInput("");
+    setEmergencyPhoneInput("");
+    await updateProfile({ emergencyContact: null });
+    setEmergencyModalVisible(false);
+  };
+
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
   const isStudent = profile?.personas?.includes("student") || profile?.interests?.includes("sports");

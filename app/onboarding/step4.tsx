@@ -30,7 +30,21 @@ export default function OnboardingStep4() {
 
   const [safetyAlerts, setSafetyAlerts] = useState(false);
   const [trainAlerts, setTrainAlerts] = useState(false);
+  // Emergency contact — state kept intact, hidden from UI per product decision
+  const [emergencyEnabled, setEmergencyEnabled] = useState(false);
+  const [emergencyName, setEmergencyName] = useState("");
+  const [emergencyPhone, setEmergencyPhone] = useState("");
+  const expandAnim = useRef(new Animated.Value(0)).current;
   const ctaScale = useRef(new Animated.Value(1)).current;
+
+  const toggleEmergency = (val: boolean) => {
+    setEmergencyEnabled(val);
+    Animated.timing(expandAnim, {
+      toValue: val ? 1 : 0,
+      duration: 250,
+      useNativeDriver: false,
+    }).start();
+  };
 
   const handleComplete = async () => {
     Animated.sequence([
@@ -48,7 +62,9 @@ export default function OnboardingStep4() {
       homeZone: params.homeZone ?? "central",
       currentZone: params.homeZone ?? "central",
       safetyAlerts,
-      emergencyContact: null,
+      emergencyContact: emergencyEnabled && emergencyName
+        ? { name: emergencyName, phone: emergencyPhone }
+        : null,
       trainAlerts,
       onboardedAt: new Date().toISOString(),
     });
