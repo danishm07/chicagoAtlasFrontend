@@ -8,6 +8,7 @@ import {
   Platform,
   Animated,
   Dimensions,
+  Modal,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, Feather, MaterialIcons } from "@expo/vector-icons";
@@ -267,8 +268,9 @@ function AlertRow({ color, text, time }: { color: string; text: string; time: st
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function PulseScreen() {
   const insets = useSafeAreaInsets();
-  const { profile } = useProfile();
+  const { profile, clearProfile } = useProfile();
   const [showBanner, setShowBanner] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
   const [loading] = useState(false);
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 84 : insets.bottom + 72;
@@ -323,7 +325,7 @@ export default function PulseScreen() {
             style={styles.iconBtn}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              // TODO: open settings panel
+              setShowSettings(true);
             }}
           >
             <Feather name="settings" size={20} color={Colors.textPrimary} />
@@ -531,6 +533,49 @@ export default function PulseScreen() {
           </Pressable>
         </View>
       </ScrollView>
+
+      {/* ── Settings Modal ── */}
+      <Modal
+        visible={showSettings}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowSettings(false)}
+      >
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => setShowSettings(false)}
+        />
+        <View style={[styles.modalSheet, { paddingBottom: insets.bottom + 24 }]}>
+          <View style={styles.modalHandle} />
+          <Text style={styles.modalTitle}>Settings</Text>
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.resetBtn,
+              { opacity: pressed ? 0.8 : 1 },
+            ]}
+            onPress={async () => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              setShowSettings(false);
+              await clearProfile();
+              router.replace("/onboarding/step1");
+            }}
+          >
+            <Feather name="refresh-ccw" size={18} color="#FFFFFF" />
+            <Text style={styles.resetBtnText}>Restart Onboarding</Text>
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.cancelBtn,
+              { opacity: pressed ? 0.7 : 1 },
+            ]}
+            onPress={() => setShowSettings(false)}
+          >
+            <Text style={styles.cancelBtnText}>Cancel</Text>
+          </Pressable>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -975,5 +1020,57 @@ const styles = StyleSheet.create({
     fontFamily: "DMMono_400Regular",
     fontSize: 11,
     color: Colors.textTertiary,
+  },
+
+  // Settings modal
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "#00000055",
+  },
+  modalSheet: {
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    gap: 12,
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.border,
+    alignSelf: "center",
+    marginBottom: 8,
+  },
+  modalTitle: {
+    fontFamily: "DMSans_700Bold",
+    fontSize: 20,
+    color: Colors.textPrimary,
+    letterSpacing: -0.4,
+    marginBottom: 8,
+  },
+  resetBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    backgroundColor: Colors.accent,
+    borderRadius: 14,
+    paddingVertical: 16,
+  },
+  resetBtnText: {
+    fontFamily: "DMSans_600SemiBold",
+    fontSize: 16,
+    color: "#FFFFFF",
+  },
+  cancelBtn: {
+    alignItems: "center",
+    paddingVertical: 14,
+  },
+  cancelBtnText: {
+    fontFamily: "DMSans_500Medium",
+    fontSize: 15,
+    color: Colors.textSecondary,
   },
 });
