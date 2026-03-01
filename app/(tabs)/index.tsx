@@ -18,7 +18,6 @@ import { useProfile } from "@/context/profile";
 import { useColors } from "@/context/theme";
 import { useSaved } from "@/context/saved";
 import { FLAGS, BACKEND_URL } from "@/constants/config";
-import SharedHeader from "@/components/SharedHeader";
 import SavedPanel from "@/components/SavedPanel";
 
 type Message = {
@@ -80,22 +79,102 @@ function getMockResponse(input: string): { text: string; sources: string[] } {
 }
 
 const QUICK_PROMPTS_BY_PERSONA: Record<string, string[]> = {
-  student: ["What's happening near campus?", "Cheapest food open right now?", "Is it safe to walk tonight?", "Any free events today?"],
-  commuter: ["CTA delays right now?", "Fastest route to the Loop?", "Is the Red Line running?", "Parking near downtown?"],
-  local: ["What's buzzing tonight?", "Any crowd spikes nearby?", "Best new spots this week?", "Neighborhood safety update?"],
-  visitor: ["Best things to do today?", "Chicago must-eats near me?", "Is Millennium Park busy?", "How do I use the CTA?"],
-  default: ["What's happening tonight?", "Is it safe to walk?", "Best food nearby?", "CTA status?"],
+  student: ["What should I do tonight?", "Is it safe to walk to the Blue Line?", "Cheapest food open near me", "What's worth going to this week?"],
+  commuter: ["What should I do tonight?", "Is it safe to walk to the Blue Line?", "Cheapest food open near me", "What's worth going to this week?"],
+  local: ["What should I do tonight?", "Is it safe to walk to the Blue Line?", "Cheapest food open near me", "What's worth going to this week?"],
+  visitor: ["What should I do tonight?", "Is it safe to walk to the Blue Line?", "Cheapest food open near me", "What's worth going to this week?"],
+  default: ["What should I do tonight?", "Is it safe to walk to the Blue Line?", "Cheapest food open near me", "What's worth going to this week?"],
 };
 
 function genId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
+// Source label mapping with icons
+function getSourceInfo(source: string): { label: string; icon: string } {
+  const s = source.toLowerCase();
+  if (s.includes("yelp") || s.includes("spots") || s.includes("google maps")) {
+    return { label: "Yelp", icon: "🟡" };
+  }
+  if (s.includes("ticketmaster") || s.includes("events")) {
+    return { label: "Events", icon: "🔵" };
+  }
+  if (s.includes("safety") || s.includes("crimes") || s.includes("cpd") || s.includes("311")) {
+    return { label: "Safety", icon: "🔴" };
+  }
+  if (s.includes("cta") || s.includes("transit") || s.includes("transitapp")) {
+    return { label: "Transit", icon: "🟢" };
+  }
+  if (s.includes("weather") || s.includes("nws")) {
+    return { label: "Weather", icon: "⚪" };
+  }
+  if (s.includes("air") || s.includes("aqi")) {
+    return { label: "Air", icon: "🟢" };
+  }
+  if (s.includes("perplexity") || s.includes("discovery")) {
+    return { label: "Discovery", icon: "🟣" };
+  }
+  return { label: source, icon: "⚪" };
+}
+
 function SourceChip({ label }: { label: string }) {
-  const C = useColors();
+  const { icon, label: cleanLabel } = getSourceInfo(label);
   return (
-    <View style={[styles.sourceChip, { backgroundColor: C.surface, borderColor: C.border }]}>
-      <Text style={[styles.sourceChipText, { color: C.textSecondary }]}>{label}</Text>
+    <View style={styles.sourceChip}>
+      <Text style={styles.sourceChipIcon}>{icon}</Text>
+      <Text style={styles.sourceChipText}>{cleanLabel}</Text>
+    </View>
+  );
+}
+
+// Harold avatar component
+function HaroldAvatar() {
+  return (
+    <View style={styles.haroldAvatar}>
+      <Text style={styles.haroldAvatarText}>H</Text>
+    </View>
+  );
+}
+
+// Pulse dot component for header
+function PulseDot() {
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 0.4,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, []);
+
+  return (
+    <Animated.View style={[styles.pulseDot, { opacity: pulseAnim }]} />
+  );
+}
+
+// Minimal header component
+function MinimalHeader() {
+  const insets = useSafeAreaInsets();
+  const topPad = Platform.OS === "web" ? 67 : insets.top;
+
+  return (
+    <View style={[styles.minimalHeader, { paddingTop: topPad + 8 }]}>
+      <View style={styles.headerLeft}>
+        <PulseDot />
+        <Text style={styles.headerText}>Chicago Pulse</Text>
+      </View>
     </View>
   );
 }
@@ -104,30 +183,32 @@ function TypingDots() {
   const dot1 = useRef(new Animated.Value(0.3)).current;
   const dot2 = useRef(new Animated.Value(0.3)).current;
   const dot3 = useRef(new Animated.Value(0.3)).current;
-  const C = useColors();
 
   useEffect(() => {
     const anim = (d: Animated.Value, delay: number) =>
       Animated.loop(
         Animated.sequence([
           Animated.delay(delay),
-          Animated.timing(d, { toValue: 1, duration: 300, useNativeDriver: true }),
-          Animated.timing(d, { toValue: 0.3, duration: 300, useNativeDriver: true }),
+          Animated.timing(d, { toValue: 1, duration: 400, useNativeDriver: true }),
+          Animated.timing(d, { toValue: 0.3, duration: 400, useNativeDriver: true }),
         ])
       );
     const a1 = anim(dot1, 0);
-    const a2 = anim(dot2, 150);
-    const a3 = anim(dot3, 300);
+    const a2 = anim(dot2, 200);
+    const a3 = anim(dot3, 400);
     a1.start(); a2.start(); a3.start();
     return () => { a1.stop(); a2.stop(); a3.stop(); };
   }, []);
 
   return (
-    <View style={[styles.aiBubble, { backgroundColor: C.surface }]}>
-      <View style={{ flexDirection: "row", gap: 5, paddingVertical: 4 }}>
-        {[dot1, dot2, dot3].map((d, i) => (
-          <Animated.View key={i} style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: C.textTertiary, opacity: d }} />
-        ))}
+    <View style={styles.aiRow}>
+      <HaroldAvatar />
+      <View style={styles.typingContainer}>
+        <View style={styles.typingDotsRow}>
+          {[dot1, dot2, dot3].map((d, i) => (
+            <Animated.View key={i} style={[styles.typingDot, { opacity: d }]} />
+          ))}
+        </View>
       </View>
     </View>
   );
@@ -149,6 +230,15 @@ export default function AskTab() {
   const [isTyping, setIsTyping] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
   const [emptyMounted, setEmptyMounted] = useState(true);
+  const [isVoiceMode, setIsVoiceMode] = useState(false);
+  const [showNewMessageIndicator, setShowNewMessageIndicator] = useState(false);
+  const flatListRef = useRef<FlatList>(null);
+  const scrollOffsetRef = useRef(0);
+  
+  // Waveform animations
+  const waveform1 = useRef(new Animated.Value(12)).current;
+  const waveform2 = useRef(new Animated.Value(20)).current;
+  const waveform3 = useRef(new Animated.Value(16)).current;
 
   const greetingOpacity = useRef(new Animated.Value(1)).current;
   const greetingY = useRef(new Animated.Value(0)).current;
@@ -158,6 +248,57 @@ export default function AskTab() {
   const inputBarOpacity = useRef(new Animated.Value(0)).current;
 
   const bottomPad = Platform.OS === "web" ? 84 : insets.bottom + 80;
+
+  // Animate waveform when in voice mode
+  useEffect(() => {
+    if (isVoiceMode) {
+      const animateBar = (bar: Animated.Value, baseHeight: number) => {
+        return Animated.loop(
+          Animated.sequence([
+            Animated.timing(bar, {
+              toValue: baseHeight * 0.4,
+              duration: 300 + Math.random() * 200,
+              useNativeDriver: false,
+            }),
+            Animated.timing(bar, {
+              toValue: baseHeight * 1.5,
+              duration: 300 + Math.random() * 200,
+              useNativeDriver: false,
+            }),
+            Animated.timing(bar, {
+              toValue: baseHeight,
+              duration: 300 + Math.random() * 200,
+              useNativeDriver: false,
+            }),
+          ])
+        );
+      };
+      const a1 = animateBar(waveform1, 12);
+      const a2 = animateBar(waveform2, 20);
+      const a3 = animateBar(waveform3, 16);
+      a1.start();
+      a2.start();
+      a3.start();
+      return () => {
+        a1.stop();
+        a2.stop();
+        a3.stop();
+        waveform1.setValue(12);
+        waveform2.setValue(20);
+        waveform3.setValue(16);
+      };
+    }
+  }, [isVoiceMode]);
+
+  // Auto-scroll to bottom when new message arrives
+  useEffect(() => {
+    if (messages.length > 0 && !isTyping) {
+      setTimeout(() => {
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+        setShowNewMessageIndicator(false);
+      }, 100);
+    }
+  }, [messages.length, isTyping]);
 
   const sendMessage = useCallback(
     async (text: string) => {
@@ -209,6 +350,22 @@ export default function AskTab() {
     [hasStarted, profile]
   );
 
+  const handleScroll = (event: any) => {
+    const offset = event.nativeEvent.contentOffset.y;
+    scrollOffsetRef.current = offset;
+    // Show indicator if scrolled up more than 100px
+    if (offset > 100) {
+      setShowNewMessageIndicator(true);
+    } else {
+      setShowNewMessageIndicator(false);
+    }
+  };
+
+  const scrollToBottom = () => {
+    flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+    setShowNewMessageIndicator(false);
+  };
+
   const renderMessage = ({ item }: { item: Message }) => {
     if (item.role === "typing") return <TypingDots />;
     if (item.role === "user") {
@@ -222,34 +379,52 @@ export default function AskTab() {
     }
     return (
       <View style={styles.aiRow}>
-        <View style={[styles.aiBubble, { backgroundColor: C.surface }]}>
-          <Text style={[styles.aiBubbleText, { color: C.textPrimary }]}>{item.text}</Text>
+        <HaroldAvatar />
+        <View style={styles.aiMessageContainer}>
+          <Text style={styles.aiBubbleText}>{item.text}</Text>
+          {item.sources && item.sources.length > 0 && (
+            <View style={styles.sourceRow}>
+              {item.sources.slice(0, 3).map((s, idx) => (
+                <SourceChip key={idx} label={s} />
+              ))}
+              {item.sources.length > 3 && (
+                <View style={styles.sourceChip}>
+                  <Text style={styles.sourceChipText}>+{item.sources.length - 3}</Text>
+                </View>
+              )}
+            </View>
+          )}
         </View>
-        {item.sources && item.sources.length > 0 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.sourceRow} contentContainerStyle={{ gap: 6 }}>
-            {item.sources.map((s) => <SourceChip key={s} label={s} />)}
-          </ScrollView>
-        )}
       </View>
     );
   };
 
   return (
-    <View style={[styles.root, { backgroundColor: C.background }]}>
-      <SharedHeader />
+    <View style={styles.root}>
+      <MinimalHeader />
 
       <View style={styles.mainArea}>
         {hasStarted && (
-          <FlatList
-            data={isTyping ? [{ id: "typing", role: "typing" as const, text: "", timestamp: new Date() }, ...messages] : messages}
-            inverted
-            keyExtractor={(item) => item.id}
-            renderItem={renderMessage}
-            contentContainerStyle={styles.messageList}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            scrollEnabled={messages.length > 0}
-          />
+          <>
+            <FlatList
+              ref={flatListRef}
+              data={isTyping ? [{ id: "typing", role: "typing" as const, text: "", timestamp: new Date() }, ...messages] : messages}
+              inverted
+              keyExtractor={(item) => item.id}
+              renderItem={renderMessage}
+              contentContainerStyle={styles.messageList}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              scrollEnabled={messages.length > 0}
+              onScroll={handleScroll}
+              scrollEventThrottle={16}
+            />
+            {showNewMessageIndicator && (
+              <Pressable style={styles.newMessageIndicator} onPress={scrollToBottom}>
+                <Text style={styles.newMessageText}>↓ new message</Text>
+              </Pressable>
+            )}
+          </>
         )}
 
         {emptyMounted && (
@@ -260,37 +435,13 @@ export default function AskTab() {
             <Animated.View
               style={[styles.greeting, { opacity: greetingOpacity, transform: [{ translateY: greetingY }] }]}
             >
-              <Text style={[styles.greetingName, { color: C.textPrimary }]}>
+              <Text style={styles.greetingName}>
                 Hey {firstName}.
               </Text>
-              <Text style={[styles.greetingSub, { color: C.textSecondary }]}>
+              <Text style={styles.greetingSub}>
                 Ask me anything about Chicago.
               </Text>
             </Animated.View>
-
-            <View style={[styles.emptyInputRow, { backgroundColor: C.surface, borderColor: C.border }]}>
-              <TextInput
-                style={[styles.emptyInput, { color: C.textPrimary }]}
-                value={inputText}
-                onChangeText={setInputText}
-                placeholder="Ask about Chicago..."
-                placeholderTextColor={C.textTertiary}
-                multiline
-                maxLength={500}
-                returnKeyType="send"
-                onSubmitEditing={() => sendMessage(inputText)}
-              />
-              <Pressable
-                onPress={() => sendMessage(inputText)}
-                disabled={!inputText.trim()}
-                style={({ pressed }) => [
-                  styles.sendBtn,
-                  { backgroundColor: inputText.trim() ? (pressed ? "#E8533A" : "#1C1B18") : C.border },
-                ]}
-              >
-                <Ionicons name="arrow-up" size={18} color="#FFFFFF" />
-              </Pressable>
-            </View>
 
             <Animated.View style={{ opacity: chipsOpacity, transform: [{ translateY: chipsY }], width: "100%" }}>
               <ScrollView
@@ -302,9 +453,9 @@ export default function AskTab() {
                   <Pressable
                     key={prompt}
                     onPress={() => sendMessage(prompt)}
-                    style={({ pressed }) => [styles.quickChip, { backgroundColor: C.background, borderColor: C.border, opacity: pressed ? 0.7 : 1 }]}
+                    style={({ pressed }) => [styles.quickChip, { opacity: pressed ? 0.7 : 1 }]}
                   >
-                    <Text style={[styles.quickChipText, { color: C.textSecondary }]}>{prompt}</Text>
+                    <Text style={styles.quickChipText}>{prompt}</Text>
                   </Pressable>
                 ))}
               </ScrollView>
@@ -313,30 +464,53 @@ export default function AskTab() {
         )}
       </View>
 
-      <Animated.View style={[{ opacity: inputBarOpacity, backgroundColor: C.background }, { pointerEvents: hasStarted ? "auto" : "none" } as any]}>
+      <Animated.View style={[{ opacity: inputBarOpacity, backgroundColor: "#111111" }, { pointerEvents: hasStarted ? "auto" : "none" } as any]}>
         <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={0}>
-          <View style={[styles.inputBar, { borderTopColor: C.border }]}>
-            <TextInput
-              style={[styles.input, { backgroundColor: C.surface, borderColor: C.border, color: C.textPrimary }]}
-              value={inputText}
-              onChangeText={setInputText}
-              placeholder="Ask about Chicago..."
-              placeholderTextColor={C.textTertiary}
-              multiline
-              maxLength={500}
-              returnKeyType="send"
-              onSubmitEditing={() => sendMessage(inputText)}
-            />
-            <Pressable
-              onPress={() => sendMessage(inputText)}
-              disabled={!inputText.trim()}
-              style={({ pressed }) => [
-                styles.sendBtn,
-                { backgroundColor: inputText.trim() ? (pressed ? "#E8533A" : "#1C1B18") : C.border },
-              ]}
-            >
-              <Ionicons name="arrow-up" size={18} color="#FFFFFF" />
-            </Pressable>
+          <View style={styles.inputBar}>
+            {isVoiceMode ? (
+              <View style={styles.voiceModeContainer}>
+                <View style={styles.waveformContainer}>
+                  <Animated.View style={[styles.waveformBar, { height: waveform1 }]} />
+                  <Animated.View style={[styles.waveformBar, { height: waveform2 }]} />
+                  <Animated.View style={[styles.waveformBar, { height: waveform3 }]} />
+                </View>
+                <Text style={styles.listeningText}>Listening...</Text>
+                <Pressable onPress={() => setIsVoiceMode(false)} style={styles.cancelVoiceBtn}>
+                  <Text style={styles.cancelVoiceText}>Cancel</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <>
+                <Pressable
+                  onPress={() => setIsVoiceMode(true)}
+                  style={styles.micButton}
+                >
+                  <Ionicons name="mic-outline" size={24} color="#555" />
+                </Pressable>
+                <TextInput
+                  style={styles.input}
+                  value={inputText}
+                  onChangeText={setInputText}
+                  placeholder="Ask Harold..."
+                  placeholderTextColor="#444"
+                  multiline
+                  maxLength={500}
+                  returnKeyType="send"
+                  onSubmitEditing={() => sendMessage(inputText)}
+                />
+                {inputText.trim() && (
+                  <Pressable
+                    onPress={() => sendMessage(inputText)}
+                    style={({ pressed }) => [
+                      styles.sendBtn,
+                      { opacity: pressed ? 0.8 : 1 },
+                    ]}
+                  >
+                    <Ionicons name="arrow-up" size={18} color="#FFFFFF" />
+                  </Pressable>
+                )}
+              </>
+            )}
           </View>
           <View style={{ height: bottomPad + 16 }} />
         </KeyboardAvoidingView>
@@ -348,9 +522,32 @@ export default function AskTab() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
+  root: { flex: 1, backgroundColor: "#000000" },
   mainArea: { flex: 1, position: "relative" },
 
+  // Minimal header
+  minimalHeader: {
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+  },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  pulseDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#E8533A",
+  },
+  headerText: {
+    fontSize: 13,
+    color: "#888",
+    fontFamily: Platform.select({ ios: "SF Pro Text", default: "System" }),
+  },
+
+  // Empty state
   emptyOverlay: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: "center",
@@ -360,80 +557,177 @@ const styles = StyleSheet.create({
     gap: 20,
   },
   greeting: { alignItems: "center", gap: 8 },
-  greetingName: { fontSize: 36, fontWeight: "700", letterSpacing: -0.8, textAlign: "center" },
-  greetingSub: { fontSize: 17, textAlign: "center", lineHeight: 24 },
-
-  emptyInputRow: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    width: "100%",
-    borderRadius: 20,
-    borderWidth: 1.5,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    gap: 10,
-  },
-  emptyInput: {
-    flex: 1,
-    fontSize: 15,
-    lineHeight: 22,
-    maxHeight: 120,
-  },
+  greetingName: { fontSize: 36, fontWeight: "700", letterSpacing: -0.8, textAlign: "center", color: "#FFFFFF" },
+  greetingSub: { fontSize: 17, textAlign: "center", lineHeight: 24, color: "#888888" },
 
   chipScroll: { gap: 8, paddingHorizontal: 0, paddingVertical: 2 },
   quickChip: {
     paddingHorizontal: 14,
     paddingVertical: 9,
     borderRadius: 20,
-    borderWidth: 1.5,
+    backgroundColor: "#1A1A1A",
   },
-  quickChipText: { fontSize: 13, fontWeight: "500" },
+  quickChipText: { fontSize: 14, color: "#FFFFFF", fontWeight: "500" },
 
-  messageList: { paddingHorizontal: 16, paddingVertical: 12, gap: 12 },
-  userRow: { alignItems: "flex-end" },
+  // Messages
+  messageList: { paddingHorizontal: 20, paddingVertical: 12, gap: 16 },
+  userRow: { alignItems: "flex-end", marginBottom: 4 },
   userBubble: {
-    backgroundColor: "#1C1B18",
-    borderRadius: 16,
-    borderBottomRightRadius: 4,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    maxWidth: "78%",
+    backgroundColor: "#1E1E1E",
+    borderRadius: 18,
+    borderBottomRightRadius: 0,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    maxWidth: "75%",
   },
-  userBubbleText: { color: "#FFFFFF", fontSize: 15, lineHeight: 22 },
-  aiRow: { alignItems: "flex-start", gap: 6 },
-  aiBubble: {
-    borderRadius: 16,
-    borderBottomLeftRadius: 4,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    maxWidth: "85%",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-  },
-  aiBubbleText: { fontSize: 15, lineHeight: 22 },
-  sourceRow: {},
-  sourceChip: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, borderWidth: 1 },
-  sourceChipText: { fontSize: 11, fontWeight: "500" },
+  userBubbleText: { color: "#F5F5F5", fontSize: 15, lineHeight: 22 },
 
+  aiRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 4,
+  },
+  haroldAvatar: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "#E8533A",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 8,
+    marginTop: 2,
+  },
+  haroldAvatarText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  aiMessageContainer: {
+    flex: 1,
+    maxWidth: "85%",
+  },
+  aiBubbleText: {
+    color: "#E8E8E8",
+    fontSize: 15,
+    lineHeight: 24,
+  },
+  sourceRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 8,
+  },
+  sourceChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 100,
+    borderWidth: 1,
+    borderColor: "#333",
+    backgroundColor: "transparent",
+    gap: 4,
+  },
+  sourceChipIcon: {
+    fontSize: 8,
+  },
+  sourceChipText: {
+    fontSize: 11,
+    color: "#555",
+  },
+
+  // Typing indicator
+  typingContainer: {
+    flex: 1,
+    maxWidth: "85%",
+  },
+  typingDotsRow: {
+    flexDirection: "row",
+    gap: 5,
+    paddingVertical: 4,
+  },
+  typingDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: "#888",
+  },
+
+  // New message indicator
+  newMessageIndicator: {
+    position: "absolute",
+    bottom: 100,
+    alignSelf: "center",
+    backgroundColor: "#E8533A",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  newMessageText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "500",
+  },
+
+  // Input bar
   inputBar: {
     flexDirection: "row",
-    alignItems: "flex-end",
+    alignItems: "center",
     gap: 10,
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderTopWidth: 1,
+    borderTopColor: "#222",
+    backgroundColor: "#111111",
+  },
+  micButton: {
+    padding: 4,
   },
   input: {
     flex: 1,
-    borderRadius: 20,
-    borderWidth: 1.5,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
     fontSize: 15,
+    color: "#F5F5F5",
+    paddingVertical: 8,
     maxHeight: 120,
-    lineHeight: 22,
   },
-  sendBtn: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  sendBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#E8533A",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  voiceModeContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+  },
+  waveformContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    marginBottom: 8,
+    height: 24,
+  },
+  waveformBar: {
+    width: 4,
+    backgroundColor: "#E8533A",
+    borderRadius: 2,
+  },
+  listeningText: {
+    color: "#555",
+    fontSize: 13,
+    marginBottom: 8,
+  },
+  cancelVoiceBtn: {
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+  },
+  cancelVoiceText: {
+    color: "#888",
+    fontSize: 13,
+  },
 });
