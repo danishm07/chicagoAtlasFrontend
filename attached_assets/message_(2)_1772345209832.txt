@@ -1,0 +1,654 @@
+
+
+
+You are helping build a mobile app called Chicago Pulse 
+for a 24-hour hackathon. The AI assistant inside the app 
+is named Harold (after Harold Washington Library — a 
+Chicago cultural landmark). 
+
+This is a React Native / Expo app. Build mobile-first, 
+clean, minimal design. Two modes: dark and light. Default 
+to dark on Screen Zero, transition to light after onboarding.
+
+Design system:
+- Light mode: bg #F7F6F3, surface #FFFFFF, text #1C1B18, 
+  secondary #7C7870, accent #E8533A (coral), border #E8E5DF
+- Dark mode: bg #0F0F0F, surface #1A1A1A, text #F7F6F3, 
+  secondary #7C7870, accent #E8533A, border #2A2A2A
+- Font: System default (San Francisco on iOS)
+- Card radius: 16px
+- Accent used sparingly — one element per screen max
+- All cards scale(0.97) on press
+- Smooth transitions between screens
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SCREEN 0 — SPLASH (dark mode only)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Full screen dark background #0F0F0F.
+Centered vertically and horizontally:
+
+- App icon: coral circle with pulse/waveform icon inside
+- App name: "Chicago Pulse" — 32px, bold, white, 
+  letter-spacing -0.03em
+- Tagline (two lines, centered):
+  "Know your city."
+  "Find your culture."
+  18px, #7C7870, line-height 1.6
+- Space
+- Single button: "Get Started →"
+  Full width (80% of screen), coral #E8533A background,
+  white text, 16px radius, 56px height
+  
+On tap: animate fade-out → transition to onboarding
+(light mode from here on)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ONBOARDING — 4 steps, one screen per step
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Progress bar at top: 4 segments, coral fill, animated.
+Each step has a Continue button (full width, dark bg)
+and a Skip text link below.
+
+STEP 1 — Identity
+Heading: "Who are you in Chicago?"
+Subheading: "Helps Harold know what matters to you."
+
+Name input: "What should Harold call you?" 
+  — text field, optional
+
+Persona multi-select (max 2, coral border when selected):
+  🎓 Student
+  💼 Commuter  
+  🏙️ Local
+  ✈️ Visitor
+
+If Student selected → Step 1b unlocks before Step 2:
+
+STEP 1b — University (only if Student)
+Heading: "Which school?"
+Single select cards:
+  DePaul University
+  Illinois Institute of Technology
+  Columbia College Chicago
+  Roosevelt University
+  University of Illinois Chicago
+  Other
+
+Below university selection:
+Toggle row: "Notify me about sports events for my school"
+  — switch component, default OFF
+  — if ON, saves sports notification preference
+
+STEP 2 — Interests
+Heading: "What are you into?"
+Multi-select pills (max 3, coral when selected):
+  🍜 Food & Drinks
+  🎭 Events & Shows
+  🏀 Sports
+  🎵 Live Music
+  🌿 Outdoor & Parks
+  💎 Hidden Gems
+  🚇 Transit & Commute
+  🎨 Arts & Culture
+
+STEP 3 — Location
+Heading: "Where are you based?"
+Single select zone cards:
+  📍 North Side
+  🎓 Near Campus (Lincoln Park / Loop)
+  🏢 The Loop / Downtown
+  🌆 South Side
+  🌉 West Side
+  📡 Use my GPS — pulsing dot animation (preferred)
+
+STEP 4 — Safety & Emergency
+Heading: "Stay safe out there."
+Subheading: "Optional but recommended."
+
+Two toggle rows, each with label + description + switch:
+
+Row 1: "Safety alerts"
+  "Get notified about serious incidents near you"
+  Switch default OFF
+
+Row 2: "Emergency contact"  
+  "Harold can notify someone if you're near danger"
+  Switch default OFF
+  
+  If Row 2 toggled ON → expand inline:
+    Name input: "Contact name"
+    Phone input: "Phone number"
+    Small text: "They'll get a text if you trigger 
+    an emergency alert."
+
+Row 3: "Train alerts"
+  "Subtle nudge when your train is arriving nearby"
+  Switch default OFF
+
+CTA: "Enter Chicago →" — coral button
+
+On complete: save full profile to AsyncStorage:
+{
+  name: string,
+  personas: string[],
+  university: string,
+  sportsNotifications: boolean,
+  interests: string[],
+  homeZone: string,
+  currentZone: string,
+  safetyAlerts: boolean,
+  emergencyContact: { name: string, phone: string } | null,
+  trainAlerts: boolean,
+  onboardedAt: string
+}
+
+Navigate to main app (tab navigation).
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MAIN APP — 3 tabs + settings
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Bottom tab navigation, 3 tabs:
+  Ask (chat icon) — default home tab
+  Signals (map/radar icon)
+  Culture (flame or spark icon)
+
+Plus settings gear icon in top-right header of every screen.
+Tab bar: #F7F6F3 bg light / #1A1A1A dark, subtle top border.
+Active tab: coral accent. Inactive: #B5B0A7.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TAB 1 — ASK (Chat with Harold)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+HEADER:
+- Harold avatar: coral rounded square, "H" or waveform icon
+- "Harold" — 15px bold
+- Green pulsing dot + "Connected to live Chicago data" 
+  in small mono text
+
+CONTEXT PILL (top of message area):
+Rounded pill, muted background:
+"📍 {currentZone} · {persona} · {N} sources active"
+
+MESSAGE AREA (scrollable, flex-1):
+
+Empty state (first open):
+Harold sends an opening message automatically:
+  "Hey {name} 👋 
+   I'm plugged into live Chicago data right now — 
+   what do you want to know?"
+  Source chips below: [Chicago 311] [Yelp] [CTA] [Weather] -> ALWAYS include source
+
+User messages: right-aligned, dark bg, white text,
+  bottom-right radius 4px
+
+Harold messages: left-aligned, white card, shadow,
+  bottom-left radius 4px
+  Below each Harold message: source chip row
+  Chips: small rounded pills, muted bg, mono font
+  Examples: [Chicago 311] [Yelp Fusion] [Ticketmaster] [CTA]
+  
+Typing indicator: 3 animated dots in Harold bubble style
+
+QUICK PROMPTS (horizontal scroll, above input):
+Generated based on onboarding profile.
+White chips, coral border on press.
+
+If student:
+  "What's happening near campus?"
+  "Cheapest food open right now?"
+  "Is it safe to walk tonight?"
+  "Any free events today?"
+  "How's the CTA running?"
+
+If commuter:
+  "How's my commute looking?"
+  "Any CTA delays right now?"
+  "Quick lunch near me under $15?"
+  "Is the Loop busy right now?"
+
+If local:
+  "What's actually worth doing tonight?"
+  "Any hidden gems open right now?"  
+  "What's trending in my neighborhood?"
+  "Best bar with no wait right now?"
+
+If visitor:
+  "What should I do in Chicago today?"
+  "What's uniquely Chicago right now?"
+  "Is it safe to explore tonight?"
+  "Best neighborhood to walk around?"
+
+INPUT ROW (pinned bottom):
+- Rounded text input: "Ask Harold anything..."
+- Circular send button: dark bg, white arrow, 
+  turns coral on press
+- Enter sends
+
+API INTEGRATION:
+POST to: {BACKEND_URL}/api/chat
+Body: {
+  message: string,
+  history: last 6 messages,
+  profile: profile from AsyncStorage
+}
+Response: streaming plain text
+
+Read as stream:
+const response = await fetch(BACKEND_URL + '/api/chat', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ message, history, profile })
+})
+const reader = response.body.getReader()
+const decoder = new TextDecoder()
+let fullText = ''
+while (true) {
+  const { done, value } = await reader.read()
+  if (done) break
+  fullText += decoder.decode(value)
+  setCurrentResponse(fullText) // update UI as tokens arrive
+}
+
+BACKEND_URL = 'https://chicago-pulse.vercel.app'
+(placeholder — will update when deployed)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TAB 2 — SIGNALS (Map + Widgets)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+LAYOUT (top to bottom, no scroll on main view):
+
+SECTION A — WIDGET ROW (top ~30% of screen)
+Horizontal swipeable row of widget cards.
+Only 2 visible at a time, side by side.
+Each card: white, 16px radius, shadow, ~45% screen width.
+
+Each widget card contains:
+- Top row: widget name (12px, secondary, uppercase mono)
+  + checkbox top-right (coral fill when selected, 
+  empty circle when not)
+- Main value: large number or status (24px, bold)
+- Sub-label: context line (12px, secondary)
+- Small trend arrow or status pill at bottom
+
+Max 2 selected at once. If user tries to select a 3rd,
+oldest deselects with subtle shake animation.
+
+Available widgets (swipe through all of these):
+
+Widget 1 — Safety
+  Icon: 🛡️
+  Value: "2 incidents" or "All clear"
+  Sub: "Last 6 hours · 800m radius"
+  Selected → red markers on map
+
+Widget 2 — Air Quality  
+  Icon: 🌿
+  Value: "AQI 37" 
+  Sub: "Good · Safe for outdoor activity"
+  Selected → red gradient overlay on map 
+  (darker = worse air)
+
+Widget 3 — Transit
+  Icon: 🚇
+  Value: "All clear" or "2 delays"
+  Sub: "CTA status right now"
+  Selected → black station markers on map
+
+Widget 4 — Crowds
+  Icon: 👥
+  Value: "Moderate"
+  Sub: "Based on events + time"
+  Selected → red density dots on map
+
+Widget 5 — Events
+  Icon: 🎟️
+  Value: "4 today"
+  Sub: "Near your zone"
+  Selected → black event markers on map
+
+Widget 6 — Weather
+  Icon: 🌤️
+  Value: "34°F"
+  Sub: "Feels like 27° · Overcast"
+  Selected → no map markers (weather is ambient)
+
+Widget 7 — Reports (Waze-style)
+  Icon: ⚠️
+  Value: "3 nearby"
+  Sub: "User-submitted reports"
+  Selected → red report markers on map
+
+First 2 widgets shown by default: Safety + Transit
+(pre-selected, checkboxes filled)
+
+SECTION B — MAP (middle ~45% of screen)
+Azure Maps component, full width.
+Minimal map style (muted streets, low contrast).
+Centered on user's currentZone coordinates.
+
+Map markers based on selected widgets only:
+- Red markers (safety/crowds/air/reports):
+  Use ● circle with subtle pulse animation
+  for active/recent items
+- Black markers (transit/events):
+  Use appropriate icon (train icon, ticket icon)
+  Small, clean, not cluttered
+
+No color changes between widget types —
+only red vs black distinction.
+
+If weather widget selected: no markers, 
+map shows a subtle weather overlay only.
+
+SECTION C — BOTTOM DRAWER (hidden by default)
+A persistent chevron button ↓ sits just below the map.
+On tap: bottom sheet slides UP over bottom 30% of screen.
+Backdrop dims slightly. Tap outside to dismiss.
+
+Inside the drawer (scrollable):
+
+Header row: "Live Alerts" left, timestamp right (mono)
+
+RECENT ALERTS list:
+Each alert row: colored dot + description + time ago
+  🔴 High severity: red dot (crime, fire, emergency)
+  🟡 Medium: yellow dot (traffic, noise)
+  🟢 Low: green dot (minor reports)
+Mock data for now, replace with live 311 data later.
+
+Divider
+
+REPORT AN INCIDENT button:
+Full width, outlined style (not filled).
+On tap → bottom sheet within bottom sheet:
+  Title: "Report to Chicago Pulse"
+  Dropdown: Type
+    - Safety concern
+    - Suspicious activity  
+    - Accident
+    - Traffic issue
+    - Other
+  Optional text input: "Add a note (optional)"
+  Submit button (coral)
+  Small text: "Reports are anonymous and shared 
+  with the community"
+  
+  On submit: add to local mock reports list,
+  show confirmation toast "Thanks — Harold sees it."
+
+EMERGENCY CONTACT button (only shows if enabled in onboarding):
+Red outlined button: "🚨 Alert my emergency contact"
+On tap: confirmation modal:
+  "Send an alert to {contactName}?"
+  "They'll receive a text with your location."
+  Two buttons: Cancel / Send Alert (red)
+  On confirm: show toast "Alert sent to {contactName}"
+  (mock send for now)
+
+API INTEGRATION for Signals tab:
+GET {BACKEND_URL}/api/score
+Returns: { score, weather, safety, events, transit, air }
+Refresh every 60 seconds.
+Show skeleton loading on first load.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TAB 3 — CULTURE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+HEADER:
+Title: "Culture" (22px, bold)
+Subtitle: "What's moving in Chicago right now" (secondary)
+
+TWO HORIZONTAL SECTIONS — swipeable left/right:
+Segmented control at top: [Trending] [Discover]
+Smooth slide animation between sections.
+
+─────────────────────────────────
+TRENDING SECTION (default left):
+─────────────────────────────────
+
+List of trending venues/events, each as a card.
+Each card: white, 16px radius, shadow, full width.
+
+Card layout:
+- Left: category icon in colored circle (coral for 
+  events/culture, dark for places)
+- Center: name (14px bold) + category tag (mono, 10px)
+- Right: sparkline graph (Apple Stocks style)
+  40px wide, 28px tall
+  Line only, no fill, coral color
+  Shows last 2 hours of activity/mentions/foot traffic
+  Upward trending = more activity
+  
+Below sparkline: trend label
+  "↑ Busy" in green or "→ Steady" in secondary
+  or "↓ Quieting" in muted
+
+Mock trending items:
+  🔥 Millennium Park · OUTDOOR
+     [upward sparkline] ↑ 3× normal traffic
+  
+  🎵 Three Top Lounge · LIVE MUSIC  
+     [upward sparkline] ↑ Fess Grandiose 8:30PM
+  
+  🍜 Gyu-Kaku Loop · RESTAURANT
+     [steady sparkline] → 20min wait, busy tonight
+  
+  🏀 United Center · SPORTS
+     [upward sparkline] ↑ Bulls game 7:30PM
+
+At bottom of trending list:
+Small text in secondary: "Signals update every 90 seconds"
+
+─────────────────────────────────
+DISCOVER SECTION (swipe right):
+─────────────────────────────────
+
+Editorial feel. Less data, more curation.
+Header inside section: "Worth finding tonight"
+
+Cards are slightly taller, more breathing room.
+Each card: white, 16px radius, shadow.
+
+Card layout:
+- Top: category pill (coral bg white text for featured,
+  muted bg for regular)
+- Title: place or event name (16px bold)
+- One line description: what makes it worth going NOW
+  (12px, secondary) — this is the key differentiator.
+  Not "Italian restaurant" but "Usually packed — 
+  only 5 min wait right now"
+- Bottom row: distance chip + price chip + 
+  open status chip (green "Open now")
+
+Mock discover items:
+  [FEATURED]
+  Intelligentsia Coffee
+  "Quieter than usual for a Saturday — no wait right now"
+  0.1 mi · $ · Open now
+
+  Chicago Cultural Center  
+  "Free admission, current exhibit closing this week"
+  0.2 mi · Free · Open until 8PM
+
+  Berghoff Bar
+  "Historic Chicago spot — shorter wait than usual tonight"
+  0.3 mi · $$ · Open now
+
+  Andy's Jazz Club
+  "Live set starts in 45 min — still seats available"
+  0.4 mi · $$ · Open now
+
+API for Culture tab:
+GET {BACKEND_URL}/api/feed?filter=all
+Refresh every 90 seconds.
+Map response to trending and discover cards.
+Show skeleton loading on first fetch.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SETTINGS SCREEN (gear icon → full screen push)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Header: "Settings" with back arrow ←
+
+Sections (grouped list style, iOS native feel):
+
+APPEARANCE
+  Dark Mode toggle (switch)
+  — toggles entire app between dark/light
+
+NOTIFICATIONS  
+  Safety Alerts toggle
+  — "Serious incidents near you"
+  
+  Sports Events toggle (only shows if sports 
+  interest selected in onboarding)
+  — "Games starting soon near you"
+  
+  Train Alerts toggle
+  — "Your train is arriving"
+
+EMERGENCY
+  Emergency Contact (shows name if set, 
+  "Not set" if not)
+  — tappable row → edit contact name + phone
+
+PROFILE
+  "Re-onboard / Change preferences"
+  — tappable → confirmation modal:
+    "Start over? This will reset your profile."
+    Cancel / Reset (red)
+    On reset: clear AsyncStorage, navigate to Screen 0
+
+ABOUT
+  App version
+  "Harold is powered by live Chicago data"
+  "Built at DemonHacks 2026"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+IN-APP NOTIFICATION BANNERS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Three types. All slide down from top of screen.
+Auto-dismiss after 6 seconds. Tap to dismiss early.
+One at a time — never stack.
+
+Safety alert (highest priority):
+  Red background #C8303A, white text
+  "🚨 {incident description} near you"
+  
+Sports alert:
+  Dark background, white text  
+  "🏀 {Team} vs {Team} starts in 60 min"
+  
+Train alert (subtle):
+  Dark background, smaller text, shorter duration (3s)
+  "🚇 {Line} arriving at {Station} in 2 min"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MOCK DATA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Use this everywhere before real API is connected:
+
+const MOCK_PROFILE = {
+  name: “Example “Student,
+  personas: ["student", "local"],
+  university: "depaul",
+  sportsNotifications: true,
+  interests: ["food", "events", "live_music"],
+  homeZone: "loop",
+  currentZone: "loop",
+  safetyAlerts: true,
+  emergencyContact: { name: "Mom", phone: "312-555-0100" },
+  trainAlerts: true,
+  onboardedAt: "2026-02-28T20:00:00Z"
+}
+
+const MOCK_SCORE = {
+  score: 74,
+  weather: { temp: "34°F", feelsLike: "27°F", 
+             condition: "Overcast" },
+  safety: { score: 88, incidents: 2, 
+            recommendation: "Safe to walk" },
+  events: 4,
+  transit: { status: "All lines running normally",
+             alerts: [] },
+  air: { aqi: 37, category: "Good" }
+}
+
+const MOCK_FEED = [
+  { id: "1", type: "event", title: "Three Top Lounge",
+    description: "Fess Grandiose · Live Tonight · 8:30PM",
+    meta: "0.6 mi", tag: "Live Music" },
+  { id: "2", type: "food", title: "Intelligentsia Coffee",
+    description: "Coffee · $ · No wait right now",
+    meta: "0.1 mi", tag: "Food" },
+  { id: "3", type: "safety", title: "All clear nearby",
+    description: "0 incidents in last 6 hours",
+    meta: "800m radius", tag: "Safety" },
+  { id: "4", type: "event", title: "Chicago Cultural Center",
+    description: "Free admission · Open until 8PM",
+    meta: "0.2 mi", tag: "Free" }
+]
+
+const MOCK_REPORTS = [
+  { id: "r1", severity: "medium", 
+    description: "Traffic blocked on State St",
+    time: "Just now" },
+  { id: "r2", severity: "low",
+    description: "Noise complaint near DePaul",
+    time: "12 min ago" },
+  { id: "r3", severity: "high",
+    description: "Fire alarm on Wabash",
+    time: "18 min ago" }
+]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FEATURE FLAGS (top of main config file)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+const FLAGS = {
+  USE_MOCK_DATA: true,
+  USE_REAL_CHAT: false,   // flip when backend URL set
+  USE_REAL_MAP: false,    // flip when Azure key set
+  SHOW_EMERGENCY: true,
+  SHOW_REPORTS: true,
+}
+
+const BACKEND_URL = 'https://chicago-pulse.vercel.app'
+// Update this when Danish deploys the backend
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+BUILD ORDER (priority for hackathon)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Build in this exact order:
+
+1. Screen 0 (splash) — 20 min
+2. Onboarding flow (4 steps) — 45 min
+3. Tab navigation shell — 15 min
+4. Ask tab (chat UI with mock responses) — 45 min
+5. Signals tab (widgets + map placeholder) — 45 min
+6. Culture tab (trending + discover) — 30 min
+7. Settings screen — 20 min
+8. Bottom drawer on Signals — 20 min
+9. Notification banners — 15 min
+10. Wire BACKEND_URL for chat — 30 min
+    (Danish will provide the URL)
+11. Wire /api/score for widgets — 20 min
+12. Wire /api/feed for culture tab — 20 min
+13. Dark/light mode toggle — 20 min
+14. Polish + fix — remaining time
+
+Total estimated: ~6 hours focused build
+
+DO NOT build in parallel — finish each screen 
+completely before moving to the next.
+DO NOT add features not listed here.
+USE mock data for everything until step 10.
