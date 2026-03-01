@@ -148,13 +148,15 @@ export default function AskTab() {
   const [inputText, setInputText] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
+  const [emptyMounted, setEmptyMounted] = useState(true);
 
   const greetingOpacity = useRef(new Animated.Value(1)).current;
   const greetingY = useRef(new Animated.Value(0)).current;
   const chipsOpacity = useRef(new Animated.Value(1)).current;
   const chipsY = useRef(new Animated.Value(0)).current;
+  const emptyOpacity = useRef(new Animated.Value(1)).current;
 
-  const bottomPad = Platform.OS === "web" ? 84 : insets.bottom + 80;
+  const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
   const sendMessage = useCallback(
     async (text: string) => {
@@ -165,11 +167,12 @@ export default function AskTab() {
       if (!hasStarted) {
         setHasStarted(true);
         Animated.parallel([
-          Animated.timing(greetingOpacity, { toValue: 0, duration: 280, useNativeDriver: true }),
-          Animated.timing(greetingY, { toValue: -40, duration: 300, useNativeDriver: true }),
+          Animated.timing(greetingOpacity, { toValue: 0, duration: 260, useNativeDriver: true }),
+          Animated.timing(greetingY, { toValue: -48, duration: 300, useNativeDriver: true }),
           Animated.timing(chipsOpacity, { toValue: 0, duration: 200, useNativeDriver: true }),
-          Animated.timing(chipsY, { toValue: 30, duration: 220, useNativeDriver: true }),
-        ]).start();
+          Animated.timing(chipsY, { toValue: 36, duration: 220, useNativeDriver: true }),
+          Animated.timing(emptyOpacity, { toValue: 0, duration: 320, useNativeDriver: true }),
+        ]).start(() => setEmptyMounted(false));
       }
 
       const userMsg: Message = { id: genId(), role: "user", text: trimmed, timestamp: new Date() };
@@ -221,7 +224,7 @@ export default function AskTab() {
           <Text style={[styles.aiBubbleText, { color: C.textPrimary }]}>{item.text}</Text>
         </View>
         {item.sources && item.sources.length > 0 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.sourceRow} contentContainerStyle={{ gap: 6, paddingHorizontal: 0 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.sourceRow} contentContainerStyle={{ gap: 6 }}>
             {item.sources.map((s) => <SourceChip key={s} label={s} />)}
           </ScrollView>
         )}
@@ -243,69 +246,99 @@ export default function AskTab() {
             contentContainerStyle={styles.messageList}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            scrollEnabled={messages.length > 0}
           />
         )}
 
-        <Animated.View
-          style={[
-            styles.greetingOverlay,
-            { opacity: greetingOpacity, transform: [{ translateY: greetingY }] },
-          ]}
-          pointerEvents={hasStarted ? "none" : "auto"}
-        >
-          <Text style={[styles.greetingName, { color: C.textPrimary }]}>
-            Hey {firstName}.
-          </Text>
-          <Text style={[styles.greetingSub, { color: C.textSecondary }]}>
-            Ask me anything about Chicago.
-          </Text>
-        </Animated.View>
+        {emptyMounted && (
+          <Animated.View
+            style={[styles.emptyOverlay, { opacity: emptyOpacity }]}
+            pointerEvents={hasStarted ? "none" : "auto"}
+          >
+            <Animated.View
+              style={[styles.greeting, { opacity: greetingOpacity, transform: [{ translateY: greetingY }] }]}
+            >
+              <Text style={[styles.greetingName, { color: C.textPrimary }]}>
+                Hey {firstName}.
+              </Text>
+              <Text style={[styles.greetingSub, { color: C.textSecondary }]}>
+                Ask me anything about Chicago.
+              </Text>
+            </Animated.View>
+
+            <View style={[styles.emptyInputRow, { backgroundColor: C.surface, borderColor: C.border }]}>
+              <TextInput
+                style={[styles.emptyInput, { color: C.textPrimary }]}
+                value={inputText}
+                onChangeText={setInputText}
+                placeholder="Ask about Chicago..."
+                placeholderTextColor={C.textTertiary}
+                multiline
+                maxLength={500}
+                returnKeyType="send"
+                onSubmitEditing={() => sendMessage(inputText)}
+              />
+              <Pressable
+                onPress={() => sendMessage(inputText)}
+                disabled={!inputText.trim()}
+                style={({ pressed }) => [
+                  styles.sendBtn,
+                  { backgroundColor: inputText.trim() ? (pressed ? "#E8533A" : "#1C1B18") : C.border },
+                ]}
+              >
+                <Ionicons name="arrow-up" size={18} color="#FFFFFF" />
+              </Pressable>
+            </View>
+
+            <Animated.View style={{ opacity: chipsOpacity, transform: [{ translateY: chipsY }], width: "100%" }}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.chipScroll}
+              >
+                {quickPrompts.map((prompt) => (
+                  <Pressable
+                    key={prompt}
+                    onPress={() => sendMessage(prompt)}
+                    style={({ pressed }) => [styles.quickChip, { backgroundColor: C.background, borderColor: C.border, opacity: pressed ? 0.7 : 1 }]}
+                  >
+                    <Text style={[styles.quickChipText, { color: C.textSecondary }]}>{prompt}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </Animated.View>
+          </Animated.View>
+        )}
       </View>
 
-      <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={0} style={{ backgroundColor: C.background }}>
-        <View style={[styles.inputBar, { backgroundColor: C.background, borderTopColor: C.border }]}>
-          <TextInput
-            style={[styles.input, { backgroundColor: C.surface, borderColor: C.border, color: C.textPrimary }]}
-            value={inputText}
-            onChangeText={setInputText}
-            placeholder="Ask about Chicago..."
-            placeholderTextColor={C.textTertiary}
-            multiline
-            maxLength={500}
-            returnKeyType="send"
-            onSubmitEditing={() => sendMessage(inputText)}
-          />
-          <Pressable
-            onPress={() => sendMessage(inputText)}
-            disabled={!inputText.trim()}
-            style={({ pressed }) => [
-              styles.sendBtn,
-              { backgroundColor: inputText.trim() ? (pressed ? "#E8533A" : "#1C1B18") : C.border },
-            ]}
-          >
-            <Ionicons name="arrow-up" size={18} color="#FFFFFF" />
-          </Pressable>
-        </View>
-
-        <Animated.View style={{ opacity: chipsOpacity, transform: [{ translateY: chipsY }], overflow: "hidden" }}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.chipScroll}
-            style={{ paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 4 }}
-          >
-            {quickPrompts.map((prompt) => (
-              <Pressable
-                key={prompt}
-                onPress={() => sendMessage(prompt)}
-                style={({ pressed }) => [styles.quickChip, { backgroundColor: C.surface, borderColor: C.border, opacity: pressed ? 0.7 : 1 }]}
-              >
-                <Text style={[styles.quickChipText, { color: C.textSecondary }]}>{prompt}</Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-        </Animated.View>
-      </KeyboardAvoidingView>
+      {hasStarted && (
+        <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={0} style={{ backgroundColor: C.background }}>
+          <View style={[styles.inputBar, { borderTopColor: C.border }]}>
+            <TextInput
+              style={[styles.input, { backgroundColor: C.surface, borderColor: C.border, color: C.textPrimary }]}
+              value={inputText}
+              onChangeText={setInputText}
+              placeholder="Ask about Chicago..."
+              placeholderTextColor={C.textTertiary}
+              multiline
+              maxLength={500}
+              returnKeyType="send"
+              onSubmitEditing={() => sendMessage(inputText)}
+            />
+            <Pressable
+              onPress={() => sendMessage(inputText)}
+              disabled={!inputText.trim()}
+              style={({ pressed }) => [
+                styles.sendBtn,
+                { backgroundColor: inputText.trim() ? (pressed ? "#E8533A" : "#1C1B18") : C.border },
+              ]}
+            >
+              <Ionicons name="arrow-up" size={18} color="#FFFFFF" />
+            </Pressable>
+          </View>
+          <View style={{ height: bottomPad + 16 }} />
+        </KeyboardAvoidingView>
+      )}
 
       <SavedPanel isOpen={panelOpen} onClose={closePanel} />
     </View>
@@ -315,44 +348,90 @@ export default function AskTab() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   mainArea: { flex: 1, position: "relative" },
-  greetingOverlay: {
-    position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
-    justifyContent: "center", alignItems: "center",
-    paddingHorizontal: 32, paddingBottom: 40,
+
+  emptyOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 24,
+    paddingBottom: 60,
+    gap: 20,
   },
-  greetingName: { fontSize: 36, fontWeight: "700", letterSpacing: -0.8, textAlign: "center", marginBottom: 8 },
+  greeting: { alignItems: "center", gap: 8 },
+  greetingName: { fontSize: 36, fontWeight: "700", letterSpacing: -0.8, textAlign: "center" },
   greetingSub: { fontSize: 17, textAlign: "center", lineHeight: 24 },
+
+  emptyInputRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    width: "100%",
+    borderRadius: 20,
+    borderWidth: 1.5,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 10,
+  },
+  emptyInput: {
+    flex: 1,
+    fontSize: 15,
+    lineHeight: 22,
+    maxHeight: 120,
+  },
+
+  chipScroll: { gap: 8, paddingHorizontal: 0, paddingVertical: 2 },
+  quickChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 20,
+    borderWidth: 1.5,
+  },
+  quickChipText: { fontSize: 13, fontWeight: "500" },
+
   messageList: { paddingHorizontal: 16, paddingVertical: 12, gap: 12 },
   userRow: { alignItems: "flex-end" },
   userBubble: {
-    backgroundColor: "#1C1B18", borderRadius: 16, borderBottomRightRadius: 4,
-    paddingHorizontal: 14, paddingVertical: 10, maxWidth: "78%",
+    backgroundColor: "#1C1B18",
+    borderRadius: 16,
+    borderBottomRightRadius: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    maxWidth: "78%",
   },
   userBubbleText: { color: "#FFFFFF", fontSize: 15, lineHeight: 22 },
   aiRow: { alignItems: "flex-start", gap: 6 },
   aiBubble: {
-    borderRadius: 16, borderBottomLeftRadius: 4,
-    paddingHorizontal: 14, paddingVertical: 10, maxWidth: "85%",
-    shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4,
+    borderRadius: 16,
+    borderBottomLeftRadius: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    maxWidth: "85%",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
   },
   aiBubbleText: { fontSize: 15, lineHeight: 22 },
-  sourceRow: { flexDirection: "row" },
+  sourceRow: {},
   sourceChip: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, borderWidth: 1 },
   sourceChipText: { fontSize: 11, fontWeight: "500" },
+
   inputBar: {
-    flexDirection: "row", alignItems: "flex-end", gap: 10,
-    paddingHorizontal: 16, paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderTopWidth: 1,
   },
   input: {
-    flex: 1, borderRadius: 20, borderWidth: 1.5,
-    paddingHorizontal: 16, paddingVertical: 10,
-    fontSize: 15, maxHeight: 120, lineHeight: 22,
+    flex: 1,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    fontSize: 15,
+    maxHeight: 120,
+    lineHeight: 22,
   },
   sendBtn: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
-  chipScroll: { paddingHorizontal: 16, paddingVertical: 8, gap: 8 },
-  quickChip: {
-    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5,
-  },
-  quickChipText: { fontSize: 13, fontWeight: "500" },
 });
