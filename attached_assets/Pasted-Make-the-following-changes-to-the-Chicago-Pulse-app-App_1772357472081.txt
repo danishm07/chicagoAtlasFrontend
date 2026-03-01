@@ -1,0 +1,171 @@
+Make the following changes to the Chicago Pulse app. Apply ALL of them. Do not break any existing functionality, styling, or design system unless explicitly told to change it. Work through each fix one by one.
+
+---
+
+FIX 1 — ONBOARDING TEXT + COPY CHANGES
+
+In the onboarding flow, make these text/copy changes only. Do not restructure any pages.
+
+Page 1:
+- Change "Who are you in Chicago?" to "Get Started"
+- Change "Helps Harold know what matters to you." to "Help us tailor your Chicago experience."
+- Change "What should Harold call you?" to "Introduce Yourself."
+- Change "Select up to 2" helper text next to "I am a..." to "Students select up to 2"
+- Make the "Continue →" button text smaller so it fits naturally inside the button without overflow — apply this fix to ALL onboarding pages that have a Continue button
+- Remove ALL mentions of "Harold" from every onboarding page
+
+Page 2:
+- Change "Pick up to 3 — Harold will tailor what he shows you." to "Tailor your experience (Pick up to 3)"
+
+Page 3 (University + Zone):
+- Remove the option "Near Campus — Lincoln Park / Loop area" entirely from the zone picker
+- Remove the helper text "Harold will surface what's closest to you." — leave only the "Where are you based?" heading
+- Replace the existing zone/neighborhood options with the 9 official sides of Chicago as the selectable choices:
+  Far North Side
+  Northwest Side
+  North Side
+  West Side
+  Central
+  South Side
+  Southwest Side
+  Far Southwest Side
+  Far Southeast Side
+  Display each as a selectable card with a small colored dot on the left (use distinct muted colors per side to differentiate them). Single select. Save the selected value to localStorage under "loop_pulse_profile" as homeZone.
+
+Page 4 (Emergency Contact page):
+- Change "Harold can notify someone if you're near danger" to "Notify someone if you're near danger"
+- Change the final CTA button from "Enter Chicago" to "Complete Setup"
+
+---
+
+FIX 2 — HIDE EMERGENCY CONTACT FROM ALL FRONTEND VIEWS
+
+Keep ALL emergency contact code and localStorage logic intact — do not delete it. But remove it from every visible UI surface:
+- Remove the emergency contact section from the onboarding UI entirely (fields, labels, helper text, everything visual)
+- Remove it from settings UI if it appears there
+- The data keys (emergencyName, emergencyPhone) should remain in the profile shape and localStorage logic silently
+
+---
+
+FIX 3 — SHARED HEADER FOR ALL THREE MAIN PAGES (Ask, Signals, Culture)
+
+Replace the current top header on ALL THREE main pages (Ask, Signals, Culture) with this unified header. It must look and behave identically across all three pages.
+
+Header layout:
+LEFT SIDE:
+- Remove "Good evening," entirely — do not show it
+- Large bold text: show the user's first name from localStorage "loop_pulse_profile". If no name saved, show nothing.
+- Below the name: a tappable location pill showing a 📍 pin icon + the user's selected Chicago side (homeZone from localStorage). If none saved, show "Chicago". Tapping it opens the zone picker so user can change their side.
+
+RIGHT SIDE:
+- Bookmark icon button — opens the Saved Places slide-over panel (see FIX 7)
+- Gear icon button — opens the existing settings panel
+- REMOVE the green LIVE pill entirely — do not show it on any page
+
+Styling: match the existing header styling exactly — same font sizes, same colors, same padding. Just remove LIVE and update the content as described.
+
+---
+
+FIX 4 — ASK PAGE (Chat) — Claude-style Layout
+
+Redesign the Ask page chat layout to work like Claude's chat interface. Do not change the AI behavior or mock responses.
+
+BEFORE CONVERSATION STARTS (empty state):
+- Center of screen: show a short generic greeting with the user's name in large text. Example: "Hey [name]." with a one-line subtitle like "Ask me anything about Chicago." Keep it minimal.
+- Below that: the chat input box (large, multi-line capable, rounded, with a send button)
+- Below the input: the quick prompt chips in a horizontal scroll row
+- No other content on screen
+
+AFTER USER SENDS FIRST MESSAGE:
+- The greeting text and subtitle slide UP and out of view (smooth animation, not instant)
+- The quick prompt chips slide DOWN and out of view (smooth animation)
+- The input box smoothly moves to the BOTTOM of the screen and stays pinned there
+- 80px bottom padding on input to clear the bottom nav bar
+- The conversation messages fill the remaining space above the input, scrollable
+- This transition is one-time per session — once the chat starts the empty state never comes back unless session is reset
+
+CHAT INPUT (pinned bottom after first message):
+- Rounded input field, placeholder: "Ask about Chicago..."
+- Send button: circular, #1C1B18 background, white arrow icon, turns coral (#E8533A) on hover
+- 80px bottom padding so it clears the bottom nav bar
+
+USER MESSAGES: right-aligned, #1C1B18 bg, white text, 16px radius, bottom-right corner 4px radius
+AI MESSAGES: left-aligned, white bg, subtle shadow, 16px radius, bottom-left corner 4px radius. Source chips below each AI message.
+
+Keep all existing mock response logic and quick prompt chips — just hide the chips after first message is sent.
+
+---
+
+FIX 5 — SIGNALS PAGE WIDGET CHANGES
+
+WIDGET STYLING:
+- Bold the widget title, make it slightly larger (16px bold)
+- Make the description/info text smaller and unbolded (12px, secondary color #7C7870)
+- Add a relevant icon to each widget block:
+  Safety → 🛡️
+  Transit → 🚇
+  Air Quality → 🌿
+  Weather → ☀️
+  Events → 🎟️
+  Crowd → 👥
+- All widget blocks must be exactly the same fixed size — no exceptions
+
+WIDGET INTERACTION:
+- Show exactly 2 widget blocks at a time, side by side
+- Remove all horizontal scroll behavior entirely
+- Press and hold on any widget block to activate swap mode
+- When swap mode activates, show a vertical slot machine sliding up from the bottom of that block showing other available widget options
+- User flicks up or down to cycle through options
+- Releasing selects the highlighted option and replaces the held block
+- Keep widget slot logic extensible — new widget types should only require adding to a widgets config array, nothing else
+
+LIVE ALERTS SECTION:
+- Change "Report to Chicago Pulse" to "Report to other Users" everywhere on this page
+
+---
+
+FIX 6 — CULTURE PAGE CHANGES
+
+- Change subtitle "What's moving in Chicago right now" to "What's happening in Chicago?"
+- To the RIGHT of the "Worth finding tonight" section heading, add a small cycling arrow button
+- Tapping cycles through exactly 3 hardcoded items (wraps back after 3):
+  1. "Gyu-Kaku Loop — Japanese BBQ, limited seats"
+  2. "Chicago Cultural Center — free exhibit, open late"
+  3. "Second City — 8PM show, tickets available"
+
+SAVEABLE ITEMS:
+- Add a small bookmark icon to every food or attraction item in the Culture page (especially Discover tab)
+- Tapping saves to localStorage key "loop_pulse_saved" as array of: { id, name, category, type, meta }
+- Saved items show a filled bookmark. Tapping again unsaves.
+- Only add bookmarks to location-type items (food, venues, attractions) — not to news or general content
+
+---
+
+FIX 7 — SAVED PLACES SLIDE-OVER PANEL
+
+Create a slide-over panel that opens from the RIGHT when the bookmark icon in the header is tapped. Available on all three main pages.
+
+- Header: "Saved Places" (bold, 18px) + × close button on the right
+- List of saved items from localStorage "loop_pulse_saved"
+- Each row: emoji/icon left, name + category center, filled bookmark unsave button right
+- Tapping unsave removes from localStorage and list in real time
+- Empty state: "Nothing saved yet. Explore the Culture tab to find places." centered in secondary color
+- Slides in from right with smooth animation, background dims with overlay
+- Tapping outside or × closes it
+
+---
+
+FIX 8 — SETTINGS PAGE
+
+DARK MODE (fix it — it currently does not work):
+- When Dark Mode is toggled ON: background becomes #1E1E1E, all text becomes white or #F0EEE9, all cards become #2A2A2A, secondary text becomes #A0A0A0
+- Apply globally across ALL pages while active
+- Save to localStorage as "loop_pulse_darkmode" (boolean)
+- On app load, read and apply immediately if true
+
+ADD VIVID MODE:
+- New toggle in settings: "Vivid Mode"
+- Description: "High contrast — easier to read for all users"
+- When ON: invert the color scheme (light backgrounds become dark, dark text becomes light)
+- Only one of Dark Mode or Vivid Mode can be ON at a time — turning one on automatically turns the other off
+- Save to localStorage as "loop_pulse_vividmode" (boolean)
