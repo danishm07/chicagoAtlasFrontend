@@ -8,13 +8,12 @@ import {
   Platform,
   Animated,
   TextInput,
-  Modal,
+  PanResponder,
   Dimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { useProfile } from "@/context/profile";
 import { useColors } from "@/context/theme";
 import { useSaved } from "@/context/saved";
 import { MOCK_SCORE, MOCK_REPORTS } from "@/constants/config";
@@ -22,52 +21,168 @@ import SharedHeader from "@/components/SharedHeader";
 import SavedPanel from "@/components/SavedPanel";
 
 const { width: SW } = Dimensions.get("window");
-const WIDGET_SIZE = (Math.min(SW, 480) - 48 - 10) / 2;
+const GRID_PADDING = 20;
+const GRID_GAP = 10;
+const WIDGET_SIZE = (Math.min(SW, 480) - GRID_PADDING * 2 - GRID_GAP) / 2;
 
+// ─── Widget definitions — add new types here only ───────────────────────────
 const WIDGETS = [
-  { id: "safety",  name: "SAFETY",      icon: "🛡️", getValue: () => `${MOCK_SCORE.safety.incidents} incidents`, sub: "Last 6 hours · 800m radius" },
-  { id: "transit", name: "TRANSIT",     icon: "🚇", getValue: () => MOCK_SCORE.transit.status.includes("normally") ? "All clear" : "Delays", sub: "CTA status right now" },
-  { id: "air",     name: "AIR QUALITY", icon: "🌿", getValue: () => `AQI ${MOCK_SCORE.air.aqi}`, sub: `${MOCK_SCORE.air.category} · Safe for outdoor` },
-  { id: "weather", name: "WEATHER",     icon: "☀️", getValue: () => MOCK_SCORE.weather.temp, sub: `Feels like ${MOCK_SCORE.weather.feelsLike}` },
-  { id: "crowds",  name: "CROWDS",      icon: "👥", getValue: () => "Moderate", sub: "Based on events + time" },
-  { id: "events",  name: "EVENTS",      icon: "🎟️", getValue: () => `${MOCK_SCORE.events} today`, sub: "Near your zone" },
-  { id: "reports", name: "REPORTS",     icon: "⚠️", getValue: () => `${MOCK_REPORTS.length} nearby`, sub: "User-submitted reports" },
-];
+  {
+    id: "safety",
+    name: "Safety",
+    icon: "🛡️",
+    getValue: () => `${MOCK_SCORE.safety.incidents} incidents`,
+    sub: "Last 6 hours · 800m radius",
+  },
+  {
+    id: "transit",
+    name: "Transit",
+    icon: "🚇",
+    getValue: () => MOCK_SCORE.transit.status.includes("normally") ? "All clear" : "Delays",
+    sub: "CTA status right now",
+  },
+  {
+    id: "air",
+    name: "Air Quality",
+    icon: "🌿",
+    getValue: () => `AQI ${MOCK_SCORE.air.aqi}`,
+    sub: `${MOCK_SCORE.air.category} · Safe outdoors`,
+  },
+  {
+    id: "weather",
+    name: "Weather",
+    icon: "☀️",
+    getValue: () => MOCK_SCORE.weather.temp,
+    sub: `Feels like ${MOCK_SCORE.weather.feelsLike}`,
+  },
+  {
+    id: "crowds",
+    name: "Crowds",
+    icon: "👥",
+    getValue: () => "Moderate",
+    sub: "Based on events + time",
+  },
+  {
+    id: "events",
+    name: "Events",
+    icon: "🎟️",
+    getValue: () => `${MOCK_SCORE.events} today`,
+    sub: "Near your zone",
+  },
+  {
+    id: "reports",
+    name: "Reports",
+    icon: "⚠️",
+    getValue: () => `${MOCK_REPORTS.length} nearby`,
+    sub: "User-submitted reports",
+  },
+] as const;
+
+type WidgetId = typeof WIDGETS[number]["id"];
 
 const REPORT_TYPES = ["Safety concern", "Suspicious activity", "Accident", "Traffic issue", "Other"];
-
 const ALERT_COLORS: Record<string, string> = { red: "#C8303A", yellow: "#B8860B", green: "#16A34A" };
 
-function ShakeView({ shaking, children }: { shaking: boolean; children: React.ReactNode }) {
-  const shakeAnim = useRef(new Animated.Value(0)).current;
+// ─── Inline Slot Machine picker ──────────────────────────────────────────────
+function SlotPicker({
+  options,
+  onSelect,
+  onDismiss,
+  C,
+}: {
+  options: typeof WIDGETS[number][];
+  onSelect: (id: WidgetId) => void;
+  onDismiss: () => void;
+  C: ReturnType<typeof useColors>;
+}) {
+  const [idx, setIdx] = useState(0);
+  const slideAnim = useRef(new Animated.Value(WIDGET_SIZE)).current;
+  const itemAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    if (shaking) {
-      Animated.sequence([
-        Animated.timing(shakeAnim, { toValue: 6, duration: 60, useNativeDriver: true }),
-        Animated.timing(shakeAnim, { toValue: -6, duration: 60, useNativeDriver: true }),
-        Animated.timing(shakeAnim, { toValue: 4, duration: 50, useNativeDriver: true }),
-        Animated.timing(shakeAnim, { toValue: -4, duration: 50, useNativeDriver: true }),
-        Animated.timing(shakeAnim, { toValue: 0, duration: 40, useNativeDriver: true }),
-      ]).start();
-    }
-  }, [shaking]);
+    Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, damping: 22, stiffness: 280 }).start();
+  }, []);
+
+  const go = (dir: 1 | -1) => {
+    const next = Math.max(0, Math.min(options.length - 1, idx + dir));
+    if (next === idx) return;
+    Haptics.selectionAsync();
+    Animated.sequence([
+      Animated.timing(itemAnim, { toValue: dir > 0 ? -16 : 16, duration: 80, useNativeDriver: true }),
+      Animated.timing(itemAnim, { toValue: 0, duration: 120, useNativeDriver: true }),
+    ]).start();
+    setIdx(next);
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 8,
+      onPanResponderRelease: (_, g) => {
+        if (g.dy < -20) go(-1);
+        else if (g.dy > 20) go(1);
+      },
+    })
+  ).current;
+
+  const confirm = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    onSelect(options[idx].id as WidgetId);
+  };
+
+  const current = options[idx];
+  const canUp = idx > 0;
+  const canDown = idx < options.length - 1;
 
   return (
-    <Animated.View style={{ transform: [{ translateX: shakeAnim }] }}>
-      {children}
+    <Animated.View
+      style={[
+        styles.slotContainer,
+        { width: WIDGET_SIZE, height: WIDGET_SIZE, backgroundColor: C.surface, borderColor: "#E8533A", transform: [{ translateY: slideAnim }] },
+      ]}
+      {...panResponder.panHandlers}
+    >
+      <Pressable
+        onPress={() => go(-1)}
+        style={[styles.slotArrowBtn, { opacity: canUp ? 1 : 0.2 }]}
+      >
+        <Ionicons name="chevron-up" size={14} color={C.textSecondary} />
+      </Pressable>
+
+      <Animated.View style={[styles.slotMiddle, { transform: [{ translateY: itemAnim }] }]}>
+        <Text style={styles.slotIcon}>{current.icon}</Text>
+        <Text style={[styles.slotName, { color: C.textPrimary }]}>{current.name}</Text>
+        <Text style={[styles.slotSub, { color: C.textTertiary }]} numberOfLines={1}>{current.sub}</Text>
+      </Animated.View>
+
+      <Pressable
+        onPress={() => go(1)}
+        style={[styles.slotArrowBtn, { opacity: canDown ? 1 : 0.2 }]}
+      >
+        <Ionicons name="chevron-down" size={14} color={C.textSecondary} />
+      </Pressable>
+
+      <Pressable onPress={confirm} style={styles.slotConfirm}>
+        <Text style={styles.slotConfirmText}>Select</Text>
+      </Pressable>
+
+      <Pressable onPress={onDismiss} style={styles.slotDismiss}>
+        <Ionicons name="close" size={12} color={C.textTertiary} />
+      </Pressable>
+
+      <Text style={[styles.slotCounter, { color: C.textTertiary }]}>
+        {idx + 1} / {options.length}
+      </Text>
     </Animated.View>
   );
 }
 
+// ─── Main screen ────────────────────────────────────────────────────────────
 export default function SignalsTab() {
   const insets = useSafeAreaInsets();
   const C = useColors();
-  const { profile } = useProfile();
   const { panelOpen, closePanel } = useSaved();
 
-  const [selectedWidgets, setSelectedWidgets] = useState<string[]>(["safety", "transit"]);
-  const [shakingWidget, setShakingWidget] = useState<string | null>(null);
+  const [selectedWidgets, setSelectedWidgets] = useState<WidgetId[]>(["safety", "transit"]);
   const [swapSlot, setSwapSlot] = useState<number | null>(null);
 
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -78,7 +193,6 @@ export default function SignalsTab() {
   const [reportText, setReportText] = useState("");
   const [reportSubmitted, setReportSubmitted] = useState(false);
   const [showToast, setShowToast] = useState(false);
-
   const toastAnim = useRef(new Animated.Value(0)).current;
 
   const bottomPad = Platform.OS === "web" ? 84 : insets.bottom + 80;
@@ -87,7 +201,6 @@ export default function SignalsTab() {
     setDrawerOpen(true);
     Animated.spring(drawerAnim, { toValue: 1, useNativeDriver: true, damping: 20, stiffness: 200 }).start();
   };
-
   const closeDrawer = () => {
     Animated.timing(drawerAnim, { toValue: 0, duration: 220, useNativeDriver: true }).start(() => setDrawerOpen(false));
   };
@@ -101,36 +214,20 @@ export default function SignalsTab() {
     ]).start(() => setShowToast(false));
   };
 
-  const handleWidgetPress = (id: string) => {
-    setSelectedWidgets((prev) => {
-      if (prev.includes(id)) return prev.filter((x) => x !== id);
-      if (prev.length >= 2) {
-        setShakingWidget(id);
-        setTimeout(() => setShakingWidget(null), 600);
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-        return prev;
-      }
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      return [...prev, id];
-    });
-  };
-
-  const handleWidgetLongPress = (idx: number) => {
+  const handleLongPress = (slot: number) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setSwapSlot(idx);
+    setSwapSlot(slot);
   };
 
-  const handleSwapSelect = (widgetId: string) => {
+  const handleSwapSelect = (widgetId: WidgetId) => {
     if (swapSlot === null) return;
     setSelectedWidgets((prev) => {
-      const next = [...prev];
+      const next = [...prev] as WidgetId[];
       next[swapSlot] = widgetId;
       return next;
     });
     setSwapSlot(null);
   };
-
-  const availableForSwap = WIDGETS.filter((w) => !selectedWidgets.includes(w.id));
 
   const drawerTranslateY = drawerAnim.interpolate({ inputRange: [0, 1], outputRange: [300, 0] });
   const overlayOpacity = drawerAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
@@ -151,23 +248,43 @@ export default function SignalsTab() {
           {[0, 1].map((slot) => {
             const wid = selectedWidgets[slot];
             const widget = WIDGETS.find((w) => w.id === wid);
-            if (!widget) return <View key={slot} style={[styles.widgetEmpty, { width: WIDGET_SIZE, borderColor: C.border }]} />;
+
+            if (swapSlot === slot) {
+              const others = WIDGETS.filter((w) => !selectedWidgets.includes(w.id));
+              return (
+                <SlotPicker
+                  key={`swap-${slot}`}
+                  options={[...others]}
+                  onSelect={handleSwapSelect}
+                  onDismiss={() => setSwapSlot(null)}
+                  C={C}
+                />
+              );
+            }
+
+            if (!widget) {
+              return <View key={slot} style={[styles.widgetEmpty, { width: WIDGET_SIZE, borderColor: C.border }]} />;
+            }
+
             return (
-              <ShakeView key={slot} shaking={shakingWidget === widget.id}>
-                <Pressable
-                  onPress={() => handleWidgetPress(widget.id)}
-                  onLongPress={() => handleWidgetLongPress(slot)}
-                  delayLongPress={500}
-                  style={({ pressed }) => [styles.widgetCard, { width: WIDGET_SIZE, backgroundColor: C.surface, borderColor: C.border, opacity: pressed ? 0.85 : 1 }]}
-                >
-                  <View style={styles.widgetTop}>
-                    <Text style={styles.widgetIcon}>{widget.icon}</Text>
-                    <Text style={[styles.widgetName, { color: C.textSecondary }]}>{widget.name}</Text>
-                  </View>
+              <Pressable
+                key={slot}
+                onLongPress={() => handleLongPress(slot)}
+                delayLongPress={500}
+                style={({ pressed }) => [
+                  styles.widgetCard,
+                  { width: WIDGET_SIZE, backgroundColor: C.surface, borderColor: C.border, opacity: pressed ? 0.85 : 1 },
+                ]}
+              >
+                <View style={styles.widgetTop}>
+                  <Text style={styles.widgetIcon}>{widget.icon}</Text>
+                </View>
+                <View style={styles.widgetBody}>
+                  <Text style={[styles.widgetName, { color: C.textPrimary }]}>{widget.name}</Text>
                   <Text style={[styles.widgetValue, { color: C.textPrimary }]}>{widget.getValue()}</Text>
-                  <Text style={[styles.widgetSub, { color: C.textTertiary }]}>{widget.sub}</Text>
-                </Pressable>
-              </ShakeView>
+                  <Text style={[styles.widgetSub, { color: "#7C7870" }]}>{widget.sub}</Text>
+                </View>
+              </Pressable>
             );
           })}
         </View>
@@ -246,7 +363,11 @@ export default function SignalsTab() {
                   multiline
                 />
                 <Pressable
-                  onPress={() => { setReportSubmitted(true); Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); showToastMsg(); }}
+                  onPress={() => {
+                    setReportSubmitted(true);
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                    showToastMsg();
+                  }}
                   style={styles.submitBtn}
                 >
                   <Text style={styles.submitBtnText}>Submit Report</Text>
@@ -257,33 +378,6 @@ export default function SignalsTab() {
             <View style={{ height: Platform.OS === "web" ? 34 : insets.bottom + 8 }} />
           </Animated.View>
         </>
-      )}
-
-      {swapSlot !== null && (
-        <Modal transparent animationType="slide" onRequestClose={() => setSwapSlot(null)}>
-          <Pressable style={styles.swapOverlay} onPress={() => setSwapSlot(null)} />
-          <View style={[styles.swapSheet, { backgroundColor: C.surface }]}>
-            <View style={[styles.swapHandle, { backgroundColor: C.border }]} />
-            <Text style={[styles.swapTitle, { color: C.textPrimary }]}>Swap Widget</Text>
-            <Text style={[styles.swapSub, { color: C.textSecondary }]}>Choose what to show in this slot</Text>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.swapList}>
-              {availableForSwap.map((w) => (
-                <Pressable
-                  key={w.id}
-                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); handleSwapSelect(w.id); }}
-                  style={({ pressed }) => [styles.swapRow, { backgroundColor: C.background, opacity: pressed ? 0.7 : 1 }]}
-                >
-                  <Text style={styles.swapIcon}>{w.icon}</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.swapWidgetName, { color: C.textPrimary }]}>{w.name}</Text>
-                    <Text style={[styles.swapWidgetSub, { color: C.textSecondary }]}>{w.sub}</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={16} color={C.textTertiary} />
-                </Pressable>
-              ))}
-            </ScrollView>
-          </View>
-        </Modal>
       )}
 
       {showToast && (
@@ -300,21 +394,55 @@ export default function SignalsTab() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   scroll: { flex: 1 },
-  content: { paddingHorizontal: 20, paddingTop: 8 },
+  content: { paddingHorizontal: GRID_PADDING, paddingTop: 8 },
   sectionLabel: { fontSize: 11, fontWeight: "700", letterSpacing: 1, marginBottom: 2 },
   sectionHint: { fontSize: 12, marginBottom: 12 },
-  widgetGrid: { flexDirection: "row", gap: 10, marginBottom: 16 },
-  widgetEmpty: { height: WIDGET_SIZE, borderRadius: 14, borderWidth: 1.5, borderStyle: "dashed" },
+
+  widgetGrid: { flexDirection: "row", gap: GRID_GAP, marginBottom: 16 },
+
+  widgetEmpty: {
+    width: WIDGET_SIZE, height: WIDGET_SIZE,
+    borderRadius: 16, borderWidth: 1.5, borderStyle: "dashed",
+  },
   widgetCard: {
-    height: WIDGET_SIZE, borderRadius: 14, borderWidth: 1.5,
-    padding: 14, justifyContent: "space-between",
+    width: WIDGET_SIZE, height: WIDGET_SIZE,
+    borderRadius: 16, borderWidth: 1.5,
+    padding: 16, justifyContent: "space-between",
     shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4,
   },
-  widgetTop: { flexDirection: "row", alignItems: "center", gap: 6 },
-  widgetIcon: { fontSize: 18 },
-  widgetName: { fontSize: 11, fontWeight: "700", letterSpacing: 0.5, flex: 1 },
-  widgetValue: { fontSize: 20, fontWeight: "700", letterSpacing: -0.3, marginVertical: 4 },
-  widgetSub: { fontSize: 11, lineHeight: 15 },
+  widgetTop: { alignItems: "flex-start" },
+  widgetIcon: { fontSize: 22 },
+  widgetBody: { gap: 3 },
+  widgetName: { fontSize: 16, fontWeight: "700", letterSpacing: -0.2 },
+  widgetValue: { fontSize: 20, fontWeight: "700", letterSpacing: -0.3 },
+  widgetSub: { fontSize: 12, lineHeight: 16 },
+
+  slotContainer: {
+    height: WIDGET_SIZE,
+    borderRadius: 16,
+    borderWidth: 2,
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 10,
+    shadowColor: "#E8533A",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+  },
+  slotArrowBtn: { paddingHorizontal: 16, paddingVertical: 6 },
+  slotMiddle: { alignItems: "center", gap: 4, flex: 1, justifyContent: "center", paddingHorizontal: 8 },
+  slotIcon: { fontSize: 24 },
+  slotName: { fontSize: 14, fontWeight: "700", textAlign: "center" },
+  slotSub: { fontSize: 11, textAlign: "center", lineHeight: 14 },
+  slotConfirm: {
+    backgroundColor: "#E8533A", borderRadius: 8,
+    paddingHorizontal: 20, paddingVertical: 6,
+  },
+  slotConfirmText: { color: "#FFF", fontSize: 12, fontWeight: "600" },
+  slotDismiss: { position: "absolute", top: 8, right: 8 },
+  slotCounter: { position: "absolute", bottom: 8, fontSize: 10 },
+
   mapPlaceholder: {
     height: 180, borderRadius: 16, marginBottom: 12,
     alignItems: "center", justifyContent: "center", gap: 6,
@@ -322,11 +450,13 @@ const styles = StyleSheet.create({
   mapDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: "#E8533A" },
   mapLabel: { fontSize: 15, fontWeight: "500" },
   mapSub: { fontSize: 12 },
+
   drawerTrigger: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingHorizontal: 16, paddingVertical: 14, borderRadius: 14, borderWidth: 1.5,
   },
   drawerTriggerText: { fontSize: 15, fontWeight: "600" },
+
   drawerOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.4)", zIndex: 10 },
   drawer: {
     position: "absolute", bottom: 0, left: 0, right: 0,
@@ -357,19 +487,7 @@ const styles = StyleSheet.create({
   },
   submitBtn: { backgroundColor: "#E8533A", borderRadius: 12, paddingVertical: 12, alignItems: "center" },
   submitBtnText: { color: "#FFF", fontSize: 14, fontWeight: "600" },
-  swapOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)" },
-  swapSheet: {
-    borderTopLeftRadius: 20, borderTopRightRadius: 20,
-    paddingTop: 12, paddingHorizontal: 20, maxHeight: "60%",
-  },
-  swapHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: 16 },
-  swapTitle: { fontSize: 17, fontWeight: "700", marginBottom: 4 },
-  swapSub: { fontSize: 13, marginBottom: 16 },
-  swapList: { gap: 8, paddingBottom: 40 },
-  swapRow: { flexDirection: "row", alignItems: "center", gap: 14, padding: 14, borderRadius: 12 },
-  swapIcon: { fontSize: 22 },
-  swapWidgetName: { fontSize: 14, fontWeight: "600" },
-  swapWidgetSub: { fontSize: 12, marginTop: 2 },
+
   toast: {
     position: "absolute", bottom: 100, alignSelf: "center",
     backgroundColor: "#1C1B18", paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20,
