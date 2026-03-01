@@ -16,10 +16,10 @@ import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 
 const PERSONAS = [
-  { id: "student", label: "🎓 Student" },
-  { id: "commuter", label: "💼 Commuter" },
-  { id: "local", label: "🏙️ Local" },
+  { id: "student", label: "🎓 University Student" },
   { id: "visitor", label: "✈️ Visitor" },
+  { id: "commuter", label: "🚗 Commuter" },
+  { id: "local", label: "🏠 Local" },
 ];
 
 function ProgressBar({ step, total }: { step: number; total: number }) {
@@ -45,9 +45,25 @@ export default function OnboardingStep1() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setPersonas((prev) => {
       if (prev.includes(id)) return prev.filter((x) => x !== id);
+      
+      // If "Visitor" is selected, it becomes the ONLY selection
       if (id === "visitor") return ["visitor"];
+      
+      // If "Visitor" is already selected, replace it with the new selection
       if (prev.includes("visitor")) return [id];
-      if (prev.length >= 2) return prev;
+      
+      // If "University Student" is selected, allow ONE additional persona (Commuter or Local)
+      if (prev.includes("student")) {
+        if (prev.length >= 2) return prev; // Max 2 selections for student
+        return [...prev, id];
+      }
+      
+      // If selecting "University Student", allow up to 2 total selections
+      if (id === "student") return [id];
+      
+      // For Commuter and Local without Student, allow only 1 selection
+      if (prev.length >= 1) return prev;
+      
       return [...prev, id];
     });
   };
@@ -113,15 +129,19 @@ export default function OnboardingStep1() {
         <View style={styles.section}>
           <View style={styles.fieldLabelRow}>
             <Text style={styles.fieldLabel}>I am a...</Text>
-            <Text style={styles.helperText}>Students select up to 2</Text>
+            <Text style={styles.helperText}>Students: select 1 more • Visitor: solo only</Text>
           </View>
           <View style={styles.pillRow}>
             {PERSONAS.map((p) => {
               const selected = personas.includes(p.id);
-              const disabled =
-                !selected &&
-                (personas.length >= 2 ||
-                  (p.id !== "visitor" && personas.includes("visitor")));
+              const disabled = !selected && (
+                // If Visitor is selected, everything else is disabled
+                personas.includes("visitor") ||
+                // If Student is selected and we already have 2 selections, disable additional
+                (personas.includes("student") && personas.length >= 2) ||
+                // If no Student and we already have 1 selection, disable additional
+                (!personas.includes("student") && personas.length >= 1)
+              );
               return (
                 <Pressable
                   key={p.id}

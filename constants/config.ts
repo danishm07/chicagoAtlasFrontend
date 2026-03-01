@@ -1,12 +1,14 @@
 export const FLAGS = {
   USE_MOCK_DATA: true,
-  USE_REAL_CHAT: false,
+  USE_REAL_CHAT: true,
   USE_REAL_MAP: false,
   SHOW_EMERGENCY: true,
   SHOW_REPORTS: true,
 } as const;
 
-export const BACKEND_URL = "https://chicago-pulse.vercel.app";
+export const BACKEND_URL = "https://loop-pulse.vercel.app";
+
+export const AZURE_MAPS_KEY = process.env.AZURE_MAPS_KEY || "demo-key";
 
 export const MOCK_SCORE = {
   score: 74,

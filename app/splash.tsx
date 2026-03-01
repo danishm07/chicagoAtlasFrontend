@@ -43,7 +43,7 @@ export default function SplashScreen() {
             <Ionicons name="pulse" size={28} color="#FFFFFF" />
           </View>
 
-          <Text style={styles.appName}>Chicago Pulse</Text>
+          <Text style={styles.appName}>Chicago Atlas</Text>
 
           <View style={styles.taglineBlock}>
             <Text style={styles.tagline}>Know your city.</Text>

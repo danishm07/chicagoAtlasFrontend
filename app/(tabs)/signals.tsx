@@ -10,13 +10,15 @@ import {
   TextInput,
   PanResponder,
   Dimensions,
+  ActivityIndicator,
+  Image,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { useColors } from "@/context/theme";
+import { useColors, useTheme } from "@/context/theme";
 import { useSaved } from "@/context/saved";
-import { MOCK_SCORE, MOCK_REPORTS } from "@/constants/config";
+import { AZURE_MAPS_KEY } from "@/constants/config";
 import SharedHeader from "@/components/SharedHeader";
 import SavedPanel from "@/components/SavedPanel";
 
@@ -25,63 +27,96 @@ const GRID_PADDING = 20;
 const GRID_GAP = 10;
 const WIDGET_SIZE = (Math.min(SW, 480) - GRID_PADDING * 2 - GRID_GAP) / 2;
 
-// ─── Widget definitions — add new types here only ───────────────────────────
-const WIDGETS = [
-  {
-    id: "safety",
-    name: "Safety",
-    icon: "shield-outline",
-    getValue: () => `${MOCK_SCORE.safety.incidents} incidents`,
-    sub: "Last 6 hours · 800m radius",
-  },
-  {
-    id: "transit",
-    name: "Transit",
-    icon: "train-outline",
-    getValue: () => MOCK_SCORE.transit.status.includes("normally") ? "All clear" : "Delays",
-    sub: "CTA status right now",
-  },
-  {
-    id: "air",
-    name: "Air Quality",
-    icon: "leaf-outline",
-    getValue: () => `AQI ${MOCK_SCORE.air.aqi}`,
-    sub: `${MOCK_SCORE.air.category} · Safe outdoors`,
-  },
-  {
-    id: "weather",
-    name: "Weather",
-    icon: "partly-sunny-outline",
-    getValue: () => MOCK_SCORE.weather.temp,
-    sub: `Feels like ${MOCK_SCORE.weather.feelsLike}`,
-  },
-  {
-    id: "crowds",
-    name: "Crowds",
-    icon: "people-outline",
-    getValue: () => "Moderate",
-    sub: "Based on events + time",
-  },
-  {
-    id: "events",
-    name: "Events",
-    icon: "calendar-outline",
-    getValue: () => `${MOCK_SCORE.events} today`,
-    sub: "Near your zone",
-  },
-  {
-    id: "reports",
-    name: "Reports",
-    icon: "alert-circle-outline",
-    getValue: () => `${MOCK_REPORTS.length} nearby`,
-    sub: "User-submitted reports",
-  },
-] as const;
+const SCORE_URL = "https://loop-pulse.vercel.app/api/score";
 
-type WidgetId = typeof WIDGETS[number]["id"];
+type ScoreResponse = {
+  score?: number;
+  weather?: { temp: string; feelsLike: string; condition?: string };
+  safety?: { score?: number; incidents?: number; recommendation?: string };
+  events?: number;
+  transit?: { status: string; alerts?: string[] };
+  air?: { aqi: number; category: string };
+  reports?: Array<{ id: string; level?: string; type?: string; location?: string; time?: string; severity?: string; description?: string }>;
+};
+
+type WidgetId = "safety" | "transit" | "air" | "weather" | "crowds" | "events" | "reports";
+
+function getWidgets(liveData: ScoreResponse | null) {
+  if (!liveData) return [];
+  const d = liveData;
+  return [
+    {
+      id: "safety" as const,
+      name: "Safety",
+      icon: "shield-outline",
+      getValue: () => `${d.safety?.incidents ?? 0} incidents`,
+      sub: "Last 6 hours · 800m radius",
+    },
+    {
+      id: "transit" as const,
+      name: "Transit",
+      icon: "train-outline",
+      getValue: () => (d.transit?.status?.includes("normally") ? "All clear" : "Details"),
+      sub: "CTA status right now",
+    },
+    {
+      id: "air" as const,
+      name: "Air Quality",
+      icon: "leaf-outline",
+      getValue: () => `AQI ${d.air?.aqi ?? 0}`,
+      sub: `${d.air?.category ?? "—"} · Safe outdoors`,
+    },
+    {
+      id: "weather" as const,
+      name: "Weather",
+      icon: "partly-sunny-outline",
+      getValue: () => d.weather?.temp ?? "—",
+      sub: `Feels like ${d.weather?.feelsLike ?? "—"}`,
+    },
+    {
+      id: "crowds" as const,
+      name: "Crowds",
+      icon: "people-outline",
+      getValue: () => "Moderate",
+      sub: "Based on events + time",
+    },
+    {
+      id: "events" as const,
+      name: "Events",
+      icon: "calendar-outline",
+      getValue: () => `${d.events ?? 0} today`,
+      sub: "Near your zone",
+    },
+    {
+      id: "reports" as const,
+      name: "Reports",
+      icon: "alert-circle-outline",
+      getValue: () => `${d.reports?.length ?? 0} nearby`,
+      sub: "User-submitted reports",
+    },
+  ];
+}
+
+function normalizeReports(reports: ScoreResponse["reports"]) {
+  if (!reports?.length) return [];
+  return reports.map((r) => ({
+    id: r.id,
+    level: r.level ?? (r.severity === "high" ? "red" : r.severity === "medium" ? "yellow" : "green"),
+    type: r.type ?? r.description ?? "Report",
+    location: r.location ?? "Nearby",
+    time: r.time ?? "Just now",
+  }));
+}
 
 const REPORT_TYPES = ["Safety concern", "Suspicious activity", "Accident", "Traffic issue", "Other"];
 const ALERT_COLORS: Record<string, string> = { red: "#C8303A", yellow: "#B8860B", green: "#16A34A" };
+
+const LIVE_ARRIVALS = [
+  { route: "Brown Line", dest: "Kimball", eta: "2 min", color: "#62361B" },
+  { route: "Green Line", dest: "Harlem/Lake", eta: "4 min", color: "#009B3A" },
+  { route: "Orange Line", dest: "Midway", eta: "7 min", color: "#F9461C" },
+  { route: "Red Line", dest: "Howard", eta: "DUE", color: "#C60C30", station: "State/Lake" } 
+];
 
 // ─── Inline Slot Machine picker ──────────────────────────────────────────────
 function SlotPicker({
@@ -90,7 +125,7 @@ function SlotPicker({
   onDismiss,
   C,
 }: {
-  options: typeof WIDGETS[number][];
+  options: Array<{ id: WidgetId; name: string; icon: string; getValue: () => string; sub: string }>;
   onSelect: (id: WidgetId) => void;
   onDismiss: () => void;
   C: ReturnType<typeof useColors>;
@@ -116,10 +151,10 @@ function SlotPicker({
 
   const panResponder = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 8,
-      onPanResponderRelease: (_, g) => {
-        if (g.dy < -20) go(-1);
-        else if (g.dy > 20) go(1);
+      onMoveShouldSetPanResponder: (_: any, gestureState: any) => Math.abs(gestureState.dy) > 8,
+      onPanResponderRelease: (_: any, gestureState: any) => {
+        if (gestureState.dy < -20) go(-1);
+        else if (gestureState.dy > 20) go(1);
       },
     })
   ).current;
@@ -176,15 +211,107 @@ function SlotPicker({
   );
 }
 
+// ─── Map Grid Fallback Component ─────────────────────────────────────────────
+function MapGridFallback({ C }: { C: ReturnType<typeof useColors> }) {
+  return (
+    <View style={[styles.mapGridFallback, { backgroundColor: C.background }]}>
+      {/* Grid lines */}
+      <View style={[styles.gridLines, { opacity: 0.1 }]}>
+        {Array.from({ length: 6 }).map((_, i) => (
+          <View key={`h-${i}`} style={[styles.gridLine, styles.gridHorizontal, { top: `${(i + 1) * 16.67}%` }]} />
+        ))}
+        {Array.from({ length: 8 }).map((_, i) => (
+          <View key={`v-${i}`} style={[styles.gridLine, styles.gridVertical, { left: `${(i + 1) * 12.5}%` }]} />
+        ))}
+      </View>
+      
+      {/* Fallback markers */}
+      <View style={[styles.markerContainer, styles.safetyMarker]}>
+        <View style={styles.calloutBubble}>
+          <Text style={styles.calloutText}>Safe Corridor</Text>
+        </View>
+        <View style={[styles.iconMarker, styles.safetyIcon]}>
+          <Ionicons name="shield-checkmark" size={20} color="#FFF" />
+        </View>
+      </View>
+      
+      <View style={[styles.markerContainer, styles.transitMarker]}>
+        <View style={styles.calloutBubble}>
+          <Text style={styles.calloutText}>Brown Line: On Time</Text>
+        </View>
+        <View style={[styles.iconMarker, styles.transitIcon]}>
+          <Ionicons name="train" size={20} color="#FFF" />
+        </View>
+      </View>
+      
+      <View style={[styles.markerContainer, styles.activityMarker]}>
+        <View style={styles.calloutBubble}>
+          <Text style={styles.calloutText}>Fairgrounds: Busy</Text>
+        </View>
+        <View style={[styles.iconMarker, styles.activityIcon]}>
+          <Ionicons name="star" size={20} color="#FFF" />
+        </View>
+      </View>
+
+      <View style={styles.legend}>
+        <Text style={styles.legendTitle}>Legend</Text>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, styles.safetyLegend]} />
+          <Text style={styles.legendText}>Safety</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, styles.transitLegend]} />
+          <Text style={styles.legendText}>Transit</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, styles.activityLegend]} />
+          <Text style={styles.legendText}>Activity</Text>
+        </View>
+      </View>
+      
+      <Text style={[styles.mapErrorText, { color: C.textSecondary }]}>Map unavailable</Text>
+    </View>
+  );
+}
+
 // ─── Main screen ────────────────────────────────────────────────────────────
 export default function SignalsTab() {
   const insets = useSafeAreaInsets();
   const C = useColors();
+  const { isDark } = useTheme();
   const { panelOpen, closePanel } = useSaved();
+
+  const [liveData, setLiveData] = useState<ScoreResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [mapError, setMapError] = useState(false);
+  const [mapLoading, setMapLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchScore = async () => {
+      try {
+        const res = await fetch(SCORE_URL);
+        if (res.ok) {
+          const data = (await res.json()) as ScoreResponse;
+          setLiveData(data);
+        }
+      } catch {
+        // keep previous data on error
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchScore();
+    const interval = setInterval(fetchScore, 90 * 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const [selectedWidgets, setSelectedWidgets] = useState<WidgetId[]>(["safety", "transit"]);
   const [swapSlot, setSwapSlot] = useState<number | null>(null);
 
+  const WIDGETS = getWidgets(liveData);
+  const reports = normalizeReports(liveData?.reports);
+
+  const [activeDrawer, setActiveDrawer] = useState<"alerts" | "transit" | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const drawerAnim = useRef(new Animated.Value(0)).current;
 
@@ -195,14 +322,46 @@ export default function SignalsTab() {
   const [showToast, setShowToast] = useState(false);
   const toastAnim = useRef(new Animated.Value(0)).current;
 
+  // Radar pulse animations for markers
+  const safetyPulse = useRef(new Animated.Value(1)).current;
+  const transitPulse = useRef(new Animated.Value(1)).current;
+  const trendingPulse = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const radarAnimation = (anim: Animated.Value) => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(anim, {
+            toValue: 0,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(anim, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    };
+
+    radarAnimation(safetyPulse);
+    radarAnimation(transitPulse);
+    radarAnimation(trendingPulse);
+  }, []);
+
   const bottomPad = Platform.OS === "web" ? 84 : insets.bottom + 80;
 
-  const openDrawer = () => {
+  const openDrawer = (type: "alerts" | "transit") => {
+    setActiveDrawer(type);
     setDrawerOpen(true);
     Animated.spring(drawerAnim, { toValue: 1, useNativeDriver: true, damping: 20, stiffness: 200 }).start();
   };
   const closeDrawer = () => {
-    Animated.timing(drawerAnim, { toValue: 0, duration: 220, useNativeDriver: true }).start(() => setDrawerOpen(false));
+    Animated.timing(drawerAnim, { toValue: 0, duration: 220, useNativeDriver: true }).start(() => {
+      setDrawerOpen(false);
+      setActiveDrawer(null);
+    });
   };
 
   const showToastMsg = () => {
@@ -232,6 +391,14 @@ export default function SignalsTab() {
   const drawerTranslateY = drawerAnim.interpolate({ inputRange: [0, 1], outputRange: [300, 0] });
   const overlayOpacity = drawerAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
 
+  if (loading) {
+    return (
+      <View style={[styles.root, styles.loadingScreen, { backgroundColor: C.background }]}>
+        <ActivityIndicator size="large" color="#E8533A" />
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.root, { backgroundColor: C.background }]}>
       <SharedHeader />
@@ -251,6 +418,17 @@ export default function SignalsTab() {
 
             if (swapSlot === slot) {
               const others = WIDGETS.filter((w) => !selectedWidgets.includes(w.id));
+              if (others.length === 0) {
+                return (
+                  <Pressable
+                    key={slot}
+                    onPress={() => setSwapSlot(null)}
+                    style={[styles.widgetEmpty, { width: WIDGET_SIZE, borderColor: C.border, alignItems: "center", justifyContent: "center" }]}
+                  >
+                    <Text style={[styles.slotSub, { color: C.textTertiary }]}>No widgets to swap</Text>
+                  </Pressable>
+                );
+              }
               return (
                 <SlotPicker
                   key={`swap-${slot}`}
@@ -269,6 +447,7 @@ export default function SignalsTab() {
             return (
               <Pressable
                 key={slot}
+                onPress={widget.id === "transit" ? () => openDrawer("transit") : undefined}
                 onLongPress={() => handleLongPress(slot)}
                 delayLongPress={500}
                 style={({ pressed }) => [
@@ -289,14 +468,63 @@ export default function SignalsTab() {
           })}
         </View>
 
-        <View style={[styles.mapPlaceholder, { backgroundColor: C.border }]}>
-          <View style={styles.mapDot} />
-          <Text style={[styles.mapLabel, { color: C.textSecondary }]}>Map coming soon</Text>
-          <Text style={[styles.mapSub, { color: C.textTertiary }]}>Azure Maps integration pending</Text>
+        <View style={[styles.mapContainer, { paddingBottom: 100 }]}>
+          <View style={[styles.manualMapBackground, { backgroundColor: '#0A192F' }]}>
+            
+            {/* Blueprint Grid Lines */}
+            <View style={styles.gridLines}>
+              {Array.from({ length: 9 }).map((_, i) => (
+                <View key={`h-${i}`} style={[styles.gridLine, styles.gridHorizontal, { top: `${(i + 1) * 10}%`, backgroundColor: '#1B2B48' }]} />
+              ))}
+              {Array.from({ length: 9 }).map((_, i) => (
+                <View key={`v-${i}`} style={[styles.gridLine, styles.gridVertical, { left: `${(i + 1) * 10}%`, backgroundColor: '#1B2B48' }]} />
+              ))}
+            </View>
+            
+            {/* Safety Marker - State/Lake */}
+            <View style={[styles.markerContainer, { top: "25%", left: "35%" }]}>
+              <View style={styles.blueprintLabel}>
+                <Text style={styles.blueprintTime}>09:30 AM</Text>
+                <Text style={styles.blueprintLocation}>STATE & LAKE</Text>
+                <Text style={[styles.blueprintStatus, { color: '#EF4444' }]}>ACTIVE ALERT</Text>
+              </View>
+              <View style={styles.pulseContainer}>
+                <View style={[styles.pulseCore, { backgroundColor: '#EF4444' }]} />
+                <Animated.View style={[styles.pulseRing, { borderColor: '#EF4444', opacity: safetyPulse, transform: [{ scale: safetyPulse.interpolate({ inputRange: [0, 1], outputRange: [2, 1] }) }] }]} />
+              </View>
+            </View>
+            
+            {/* Transit Marker - Washington/Wabash */}
+            <View style={[styles.markerContainer, { top: "50%", left: "60%" }]}>
+              <View style={styles.blueprintLabel}>
+                <Text style={styles.blueprintTime}>LIVE</Text>
+                <Text style={styles.blueprintLocation}>CTA BROWN LINE</Text>
+                <Text style={[styles.blueprintStatus, { color: '#10B981' }]}>ON TIME</Text>
+              </View>
+              <View style={styles.pulseContainer}>
+                <View style={[styles.pulseCore, { backgroundColor: '#10B981' }]} />
+                <Animated.View style={[styles.pulseRing, { borderColor: '#10B981', opacity: transitPulse, transform: [{ scale: transitPulse.interpolate({ inputRange: [0, 1], outputRange: [2, 1] }) }] }]} />
+              </View>
+            </View>
+            
+            {/* Activity Marker - Millennium Park */}
+            <View style={[styles.markerContainer, { top: "70%", left: "45%" }]}>
+              <View style={styles.blueprintLabel}>
+                <Text style={styles.blueprintTime}>TRENDING</Text>
+                <Text style={styles.blueprintLocation}>MILLENNIUM PARK</Text>
+                <Text style={[styles.blueprintStatus, { color: '#FB7185' }]}>HIGH FOOT TRAFFIC</Text>
+              </View>
+              <View style={styles.pulseContainer}>
+                <View style={[styles.pulseCore, { backgroundColor: '#FB7185' }]} />
+                <Animated.View style={[styles.pulseRing, { borderColor: '#FB7185', opacity: trendingPulse, transform: [{ scale: trendingPulse.interpolate({ inputRange: [0, 1], outputRange: [2, 1] }) }] }]} />
+              </View>
+            </View>
+
+          </View>
         </View>
 
         <Pressable
-          onPress={openDrawer}
+          onPress={() => openDrawer("alerts")}
           style={({ pressed }) => [styles.drawerTrigger, { backgroundColor: C.surface, borderColor: C.border, opacity: pressed ? 0.8 : 1 }]}
         >
           <Text style={[styles.drawerTriggerText, { color: C.textPrimary }]}>Live Alerts</Text>
@@ -312,66 +540,136 @@ export default function SignalsTab() {
           <Animated.View style={[styles.drawer, { backgroundColor: C.surface, transform: [{ translateY: drawerTranslateY }] }]}>
             <View style={[styles.drawerHandle, { backgroundColor: C.border }]} />
             <View style={styles.drawerHeaderRow}>
-              <Text style={[styles.drawerTitle, { color: C.textPrimary }]}>Live Alerts</Text>
+              <Text style={[styles.drawerTitle, { color: C.textPrimary }]}>
+                {activeDrawer === "transit" ? "CTA Live Status" : "Live Alerts"}
+              </Text>
               <Text style={[styles.drawerTimestamp, { color: C.textTertiary }]}>Updated just now</Text>
             </View>
 
-            {MOCK_REPORTS.map((r) => (
-              <View key={r.id} style={[styles.alertRow, { borderBottomColor: C.border }]}>
-                <View style={[styles.alertDot, { backgroundColor: ALERT_COLORS[r.level] ?? C.textTertiary }]} />
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.alertTitle, { color: C.textPrimary }]}>{r.type}</Text>
-                  <Text style={[styles.alertSub, { color: C.textSecondary }]}>{r.location} · {r.time}</Text>
-                </View>
-              </View>
-            ))}
+            {activeDrawer === "alerts" && (
+              <>
+                {reports.map((r) => (
+                  <View key={r.id} style={[styles.alertRow, { borderBottomColor: C.border }]}>
+                    <View style={[styles.alertDot, { backgroundColor: ALERT_COLORS[r.level] ?? C.textTertiary }]} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.alertTitle, { color: C.textPrimary }]}>{r.type}</Text>
+                      <Text style={[styles.alertSub, { color: C.textSecondary }]}>{r.location} · {r.time}</Text>
+                    </View>
+                  </View>
+                ))}
 
-            <View style={[styles.drawerDivider, { backgroundColor: C.border }]} />
+                <View style={[styles.drawerDivider, { backgroundColor: C.border }]} />
 
-            {!reportExpanded ? (
-              <Pressable
-                onPress={() => setReportExpanded(true)}
-                style={({ pressed }) => [styles.reportBtn, { borderColor: C.border, opacity: pressed ? 0.7 : 1 }]}
-              >
-                <Ionicons name="warning-outline" size={16} color={C.textSecondary} />
-                <Text style={[styles.reportBtnText, { color: C.textSecondary }]}>Report to other Users</Text>
-              </Pressable>
-            ) : reportSubmitted ? (
-              <View style={styles.thankRow}>
-                <Text style={[styles.thankText, { color: C.textPrimary }]}>Thanks — report received 🙌</Text>
-              </View>
-            ) : (
-              <View style={styles.reportForm}>
-                <Text style={[styles.reportFormLabel, { color: C.textSecondary }]}>Type</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.reportTypePills}>
-                  {REPORT_TYPES.map((t) => (
+                {!reportExpanded ? (
+                  <Pressable
+                    onPress={() => setReportExpanded(true)}
+                    style={({ pressed }) => [styles.reportBtn, { borderColor: C.border, opacity: pressed ? 0.7 : 1 }]}
+                  >
+                    <Ionicons name="warning-outline" size={16} color={C.textSecondary} />
+                    <Text style={[styles.reportBtnText, { color: C.textSecondary }]}>Report to other Users</Text>
+                  </Pressable>
+                ) : reportSubmitted ? (
+                  <View style={styles.thankRow}>
+                    <Text style={[styles.thankText, { color: C.textPrimary }]}>Thanks — report received 🙌</Text>
                     <Pressable
-                      key={t}
-                      onPress={() => setReportType(t)}
-                      style={[styles.reportTypePill, { backgroundColor: reportType === t ? "#E8533A" : C.surface, borderColor: reportType === t ? "#E8533A" : C.border }]}
+                      onPress={() => {
+                        setReportSubmitted(false);
+                        setReportText("");
+                        setReportExpanded(false);
+                      }}
+                      style={styles.submitAnotherBtn}
                     >
-                      <Text style={{ fontSize: 12, color: reportType === t ? "#FFF" : C.textSecondary, fontWeight: "500" }}>{t}</Text>
+                      <Text style={styles.submitAnotherText}>Submit Another</Text>
                     </Pressable>
+                  </View>
+                ) : (
+                  <View style={styles.reportForm}>
+                    <Text style={[styles.reportFormLabel, { color: C.textSecondary }]}>Type</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.reportTypePills}>
+                      {REPORT_TYPES.map((t) => (
+                        <Pressable
+                          key={t}
+                          onPress={() => setReportType(t)}
+                          style={[styles.reportTypePill, { backgroundColor: reportType === t ? "#E8533A" : C.surface, borderColor: reportType === t ? "#E8533A" : C.border }]}
+                        >
+                          <Text style={{ fontSize: 12, color: reportType === t ? "#FFF" : C.textSecondary, fontWeight: "500" }}>{t}</Text>
+                        </Pressable>
+                      ))}
+                    </ScrollView>
+                    <TextInput
+                      style={[styles.reportInput, { backgroundColor: C.background, borderColor: C.border, color: C.textPrimary }]}
+                      placeholder="Add a note (optional)"
+                      placeholderTextColor={C.textTertiary}
+                      value={reportText}
+                      onChangeText={setReportText}
+                      multiline
+                    />
+                    <Pressable
+                      onPress={() => {
+                        setReportSubmitted(true);
+                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                        showToastMsg();
+                      }}
+                      style={styles.submitBtn}
+                    >
+                      <Text style={styles.submitBtnText}>Submit Report</Text>
+                    </Pressable>
+                  </View>
+                )}
+              </>
+            )}
+
+            {activeDrawer === "transit" && (
+              <View style={{ flex: 1, paddingTop: 4 }}>
+                
+                {/* 1. Live Arrivals Section */}
+                <Text style={[styles.sectionLabel, { color: C.textTertiary, marginBottom: 8 }]}>
+                  NEARBY ARRIVALS • WASHINGTON / WABASH
+                </Text>
+                <View style={{ marginBottom: 20 }}>
+                  {LIVE_ARRIVALS.map((train, i) => (
+                    <View key={i} style={[styles.arrivalRow, { borderBottomColor: C.border }]}>
+                      <View style={styles.arrivalLeft}>
+                        <View style={[styles.trainLineColor, { backgroundColor: train.color }]} />
+                        <View>
+                          <Text style={[styles.trainRoute, { color: C.textPrimary }]}>{train.route}</Text>
+                          <Text style={[styles.trainDest, { color: C.textSecondary }]}>To {train.dest}</Text>
+                        </View>
+                      </View>
+                      <Text style={[
+                        styles.trainEta, 
+                        { color: train.eta === "DUE" ? "#E8533A" : C.textPrimary }
+                      ]}>
+                        {train.eta}
+                      </Text>
+                    </View>
                   ))}
-                </ScrollView>
-                <TextInput
-                  style={[styles.reportInput, { backgroundColor: C.background, borderColor: C.border, color: C.textPrimary }]}
-                  placeholder="Add a note (optional)"
-                  placeholderTextColor={C.textTertiary}
-                  value={reportText}
-                  onChangeText={setReportText}
-                  multiline
-                />
-                <Pressable
-                  onPress={() => {
-                    setReportSubmitted(true);
-                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                    showToastMsg();
-                  }}
-                  style={styles.submitBtn}
-                >
-                  <Text style={styles.submitBtnText}>Submit Report</Text>
-                </Pressable>
+                </View>
+
+                {/* 2. System Alerts Section */}
+                <Text style={[styles.sectionLabel, { color: C.textTertiary, marginBottom: 8 }]}>
+                  SYSTEM ALERTS
+                </Text>
+                {(liveData?.transit?.alerts ?? []).length === 0 ? (
+                  <View style={styles.transitSuccessRow}>
+                    <Ionicons name="checkmark-circle" size={20} color="#16A34A" />
+                    <Text style={[styles.transitSuccessText, { color: C.textPrimary }]}>
+                      All CTA lines are running normally.
+                    </Text>
+                  </View>
+                ) : (
+                  (liveData?.transit?.alerts ?? []).map((alert, idx) => {
+                    const parts = alert.split(/[—:]/);
+                    const route = parts[0]?.trim() ?? "CTA";
+                    const headline = parts.slice(1).join(":").trim() || alert;
+                    return (
+                      <View key={idx} style={[styles.transitAlertRow, { borderBottomColor: C.border }]}>
+                        <Text style={[styles.transitRoute, { color: C.textPrimary }]}>{route}</Text>
+                        <Text style={[styles.transitHeadline, { color: C.textSecondary }]}>{headline}</Text>
+                      </View>
+                    );
+                  })
+                )}
               </View>
             )}
 
@@ -393,6 +691,7 @@ export default function SignalsTab() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  loadingScreen: { alignItems: "center", justifyContent: "center" },
   scroll: { flex: 1 },
   content: { paddingHorizontal: GRID_PADDING, paddingTop: 8 },
   sectionLabel: { fontSize: 11, fontWeight: "700", letterSpacing: 1, marginBottom: 2 },
@@ -441,13 +740,212 @@ const styles = StyleSheet.create({
   slotDismiss: { position: "absolute", top: 8, right: 8 },
   slotCounter: { position: "absolute", bottom: 8, fontSize: 10 },
 
-  mapPlaceholder: {
-    height: 180, borderRadius: 16, marginBottom: 12,
-    alignItems: "center", justifyContent: "center", gap: 6,
+  mapContainer: {
+    height: 300,
+    borderRadius: 16,
+    marginBottom: 12,
+    overflow: "hidden",
+    position: "relative",
   },
-  mapDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: "#E8533A" },
-  mapLabel: { fontSize: 15, fontWeight: "500" },
-  mapSub: { fontSize: 12 },
+  manualMapBackground: {
+    width: "100%",
+    height: "100%",
+    position: "relative",
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  indicatorContainer: {
+    position: "absolute",
+    alignItems: "center",
+    flexDirection: "row",
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  indicatorIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 8,
+  },
+  indicatorLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  safetyIndicator: {
+    top: "20%",
+    left: "10%",
+  },
+  safetyIndicatorIcon: {
+    backgroundColor: "#EF4444",
+  },
+  transitIndicator: {
+    top: "40%",
+    left: "15%",
+  },
+  transitIndicatorIcon: {
+    backgroundColor: "#10B981",
+  },
+  spotsIndicator: {
+    top: "60%",
+    left: "20%",
+  },
+  spotsIndicatorIcon: {
+    backgroundColor: "#FB7185",
+  },
+  markerContainer: {
+    position: "absolute",
+    alignItems: "center",
+  },
+  calloutBubble: {
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginBottom: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  calloutText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#1C1B18",
+  },
+  iconMarker: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 6,
+  },
+  safetyMarker: {
+    top: "25%",
+    left: "35%",
+  },
+  safetyIcon: {
+    backgroundColor: "#EF4444",
+  },
+  transitMarker: {
+    top: "50%",
+    left: "60%",
+  },
+  transitIcon: {
+    backgroundColor: "#10B981",
+  },
+  activityMarker: {
+    top: "70%",
+    left: "45%",
+  },
+  activityIcon: {
+    backgroundColor: "#FB7185",
+  },
+  legend: {
+    position: "absolute",
+    bottom: 12,
+    right: 12,
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
+    padding: 10,
+    borderRadius: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 4,
+  },
+  legendTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#1C1B18",
+    marginBottom: 6,
+  },
+  legendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 3,
+  },
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  safetyLegend: {
+    backgroundColor: "#EF4444",
+  },
+  transitLegend: {
+    backgroundColor: "#10B981",
+  },
+  activityLegend: {
+    backgroundColor: "#FB7185",
+  },
+  legendText: {
+    fontSize: 11,
+    color: "#1C1B18",
+    fontWeight: "500",
+  },
+  mapGridFallback: {
+    width: "100%",
+    height: "100%",
+    position: "relative",
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  gridLines: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  gridLine: {
+    position: "absolute",
+    backgroundColor: "#1B2B48",
+  },
+  gridHorizontal: {
+    left: 0,
+    right: 0,
+    height: 1,
+  },
+  gridVertical: {
+    top: 0,
+    bottom: 0,
+    width: 1,
+  },
+  mapLoadingOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.8)",
+  },
+  mapErrorText: {
+    position: "absolute",
+    bottom: 20,
+    left: 0,
+    right: 0,
+    textAlign: "center",
+    fontSize: 12,
+    fontWeight: "500",
+  },
 
   drawerTrigger: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
@@ -459,7 +957,7 @@ const styles = StyleSheet.create({
   drawer: {
     position: "absolute", bottom: 0, left: 0, right: 0,
     borderTopLeftRadius: 20, borderTopRightRadius: 20,
-    paddingTop: 12, paddingHorizontal: 20, zIndex: 11,
+    paddingTop: 12, paddingHorizontal: 20, paddingBottom: 90, zIndex: 11,
     shadowColor: "#000", shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.12, shadowRadius: 16,
   },
   drawerHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: 16 },
@@ -470,6 +968,11 @@ const styles = StyleSheet.create({
   alertDot: { width: 8, height: 8, borderRadius: 4, marginTop: 4 },
   alertTitle: { fontSize: 14, fontWeight: "600" },
   alertSub: { fontSize: 12, marginTop: 2 },
+  transitSuccessRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 16 },
+  transitSuccessText: { fontSize: 15, fontWeight: "500", flex: 1 },
+  transitAlertRow: { paddingVertical: 12, borderBottomWidth: 1, gap: 4 },
+  transitRoute: { fontSize: 14, fontWeight: "700" },
+  transitHeadline: { fontSize: 13, lineHeight: 18 },
   drawerDivider: { height: 1, marginVertical: 12 },
   reportBtn: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 12, paddingHorizontal: 16, borderRadius: 12, borderWidth: 1.5 },
   reportBtnText: { fontSize: 14, fontWeight: "500" },
@@ -485,6 +988,8 @@ const styles = StyleSheet.create({
   },
   submitBtn: { backgroundColor: "#E8533A", borderRadius: 12, paddingVertical: 12, alignItems: "center" },
   submitBtnText: { color: "#FFF", fontSize: 14, fontWeight: "600" },
+  submitAnotherBtn: { backgroundColor: "#1C1B18", borderRadius: 12, paddingVertical: 12, alignItems: "center", marginTop: 12 },
+  submitAnotherText: { color: "#FFF", fontSize: 14, fontWeight: "600" },
 
   toast: {
     position: "absolute", bottom: 100, alignSelf: "center",
@@ -492,4 +997,109 @@ const styles = StyleSheet.create({
     shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8,
   },
   toastText: { color: "#FFF", fontSize: 13, fontWeight: "500" },
+
+  // Blueprint aesthetic styles
+  blueprintLabel: {
+    backgroundColor: "rgba(30, 58, 95, 0.8)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    marginBottom: 6,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#1E3A5F",
+  },
+  blueprintTime: {
+    fontSize: 9,
+    color: "#64FFDA",
+    fontFamily: Platform.OS === "web" ? "SF Mono, Monaco, monospace" : "monospace",
+    fontWeight: "600",
+    letterSpacing: 0.5,
+  },
+  blueprintLocation: {
+    fontSize: 10,
+    color: "#FFFFFF",
+    fontFamily: Platform.OS === "web" ? "SF Mono, Monaco, monospace" : "monospace",
+    fontWeight: "700",
+    letterSpacing: 0.3,
+    marginTop: 1,
+  },
+  blueprintStatus: {
+    fontSize: 8,
+    color: "#8892B0",
+    fontFamily: Platform.OS === "web" ? "SF Mono, Monaco, monospace" : "monospace",
+    fontWeight: "500",
+    letterSpacing: 0.8,
+    marginTop: 1,
+  },
+  pulseContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    width: 24,
+    height: 24,
+  },
+  pulseCore: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    position: "absolute",
+    zIndex: 2,
+  },
+  pulseRing: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    position: "absolute",
+    borderWidth: 1,
+    opacity: 0,
+  },
+  safetyPulse: {
+    backgroundColor: "#EF4444",
+  },
+  safetyRing: {
+    borderColor: "#EF4444",
+  },
+  transitPulse: {
+    backgroundColor: "#10B981",
+  },
+  transitRing: {
+    borderColor: "#10B981",
+  },
+  trendingPulse: {
+    backgroundColor: "#FB7185",
+  },
+  trendingRing: {
+    borderColor: "#FB7185",
+  },
+  arrivalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  arrivalLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  trainLineColor: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+  },
+  trainRoute: {
+    fontSize: 15,
+    fontWeight: "700",
+    letterSpacing: -0.2,
+  },
+  trainDest: {
+    fontSize: 13,
+    marginTop: 2,
+  },
+  trainEta: {
+    fontSize: 16,
+    fontWeight: "800",
+    letterSpacing: -0.5,
+  },
 });

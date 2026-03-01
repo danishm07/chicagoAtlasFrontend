@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -16,43 +16,25 @@ import { useSaved } from "@/context/saved";
 import SharedHeader from "@/components/SharedHeader";
 import SavedPanel from "@/components/SavedPanel";
 
-// TODO: GET /api/feed?filter=all — refresh every 90 seconds
+const FEED_URL = "https://loop-pulse.vercel.app/api/feed?filter=all";
 
-const TRENDING = [
-  { id: "t1", icon: "🔥", iconBg: "#E8533A", name: "Millennium Park", category: "OUTDOOR", trend: "up" as const, trendLabel: "↑ 3× normal traffic", sparkData: [2, 3, 4, 5, 6, 7, 8, 9, 10, 9] },
-  { id: "t2", icon: "🎵", iconBg: "#5856D6", name: "Three Top Lounge", category: "LIVE MUSIC", trend: "up" as const, trendLabel: "↑ Fess Grandiose 8:30PM", sparkData: [3, 3, 4, 5, 5, 6, 8, 9, 9, 10] },
-  { id: "t3", icon: "🍜", iconBg: "#FF9500", name: "Gyu-Kaku Loop", category: "RESTAURANT", trend: "steady" as const, trendLabel: "→ 20min wait, busy tonight", sparkData: [6, 7, 6, 7, 6, 7, 6, 7, 6, 7] },
-  { id: "t4", icon: "🏀", iconBg: "#C8303A", name: "United Center", category: "SPORTS", trend: "up" as const, trendLabel: "↑ Bulls game 7:30PM", sparkData: [1, 2, 3, 4, 5, 6, 8, 9, 10, 10] },
-];
-
-const DISCOVER_SETS = [
-  [
-    { id: "d1", featured: true, category: "FEATURED", name: "Intelligentsia Coffee", description: "Quieter than usual for a Saturday — no wait right now", distance: "0.1 mi", price: "$", open: "Open now" },
-    { id: "d2", featured: false, category: "CULTURE", name: "Chicago Cultural Center", description: "Free admission, current exhibit closing this week", distance: "0.2 mi", price: "Free", open: "Open now" },
-    { id: "d3", featured: false, category: "BAR", name: "The Berghoff Bar", description: "Happy hour until 7PM, usually mellow on weeknights", distance: "0.3 mi", price: "$$", open: "Open now" },
-    { id: "d4", featured: false, category: "JAZZ", name: "Andy's Jazz Club", description: "Live set starts 9PM, $10 cover — real Chicago jazz", distance: "0.4 mi", price: "$$", open: "Open · 9PM show" },
-  ],
-  [
-    { id: "d1", featured: true, category: "FEATURED", name: "Intelligentsia Coffee", description: "About a 20 min wait — filling up fast this afternoon", distance: "0.1 mi", price: "$", open: "Open now" },
-    { id: "d2", featured: false, category: "CULTURE", name: "Chicago Cultural Center", description: "Last day of the current exhibit — free, worth seeing", distance: "0.2 mi", price: "Free", open: "Open now" },
-    { id: "d3", featured: false, category: "BAR", name: "The Berghoff Bar", description: "Happy hour ending soon, bar is starting to pick up", distance: "0.3 mi", price: "$$", open: "Open now" },
-    { id: "d4", featured: false, category: "JAZZ", name: "Andy's Jazz Club", description: "Doors open at 8PM, grab a seat before the rush", distance: "0.4 mi", price: "$$", open: "Opens 8PM" },
-  ],
-  [
-    { id: "d1", featured: true, category: "FEATURED", name: "Intelligentsia Coffee", description: "Just opened up — no wait, great window seats available", distance: "0.1 mi", price: "$", open: "Open now" },
-    { id: "d2", featured: false, category: "CULTURE", name: "Chicago Cultural Center", description: "Sold out tomorrow — free tonight only, walk right in", distance: "0.2 mi", price: "Free", open: "Open now" },
-    { id: "d3", featured: false, category: "BAR", name: "The Berghoff Bar", description: "Mellow tonight, easy to get a table at the bar", distance: "0.3 mi", price: "$$", open: "Open now" },
-    { id: "d4", featured: false, category: "JAZZ", name: "Andy's Jazz Club", description: "Late set at 11PM added — intimate crowd, killer lineup", distance: "0.4 mi", price: "$$", open: "Open · 11PM late set" },
-  ],
-];
-
-const TONIGHT_CYCLE = [
-  "Gyu-Kaku Loop — Japanese BBQ, limited seats",
-  "Chicago Cultural Center — free exhibit, open late",
-  "Second City — 8PM show, tickets available",
-];
+type FeedItem = {
+  type: string;
+  title: string;
+  description: string;
+  meta?: string;
+  time?: string;
+  tag?: string;
+  id?: string;
+};
 
 const TREND_COLORS: Record<string, string> = { up: "#16A34A", steady: "#7C7870", down: "#B5B0A7" };
+const TYPE_ICONS: Record<string, { icon: string; bg: string }> = {
+  event: { icon: "🎵", bg: "#5856D6" },
+  transit: { icon: "🚇", bg: "#16A34A" },
+  food: { icon: "🍜", bg: "#FF9500" },
+  safety: { icon: "🛡️", bg: "#E8533A" },
+};
 
 function Sparkline({ data, color }: { data: number[]; color: string }) {
   const max = Math.max(...data);
@@ -103,26 +85,46 @@ export default function CultureTab() {
   const C = useColors();
   const { saveItem, unsaveItem, isSaved, panelOpen, closePanel } = useSaved();
   const [tab, setTab] = useState("trending");
-  const [cycleIdx, setCycleIdx] = useState(0);
-  const [discoverVersion, setDiscoverVersion] = useState(0);
+  const [trendingItems, setTrendingItems] = useState<FeedItem[]>([]);
+  const [discoverItems, setDiscoverItems] = useState<FeedItem[]>([]);
+
+  useEffect(() => {
+    const fetchFeed = async () => {
+      try {
+        const res = await fetch(FEED_URL);
+        if (res.ok) {
+          const data = (await res.json()) as FeedItem[];
+          const trending = data.filter((i) => i.type === "event" || i.type === "transit");
+          const discover = data.filter((i) => i.type === "food" || i.type === "safety");
+          setTrendingItems(trending.map((i, idx) => ({ ...i, id: i.id ?? `trend-${idx}-${i.title}` })));
+          setDiscoverItems(discover.map((i, idx) => ({ ...i, id: i.id ?? `disc-${idx}-${i.title}` })));
+        }
+      } catch {
+        // keep previous data on error
+      }
+    };
+    fetchFeed();
+  }, []);
 
   const bottomPad = Platform.OS === "web" ? 84 : insets.bottom + 80;
 
-  const handleBookmark = (item: typeof DISCOVER_SETS[0][0]) => {
+  const handleBookmark = (item: FeedItem) => {
+    const id = item.id ?? item.title;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (isSaved(item.id)) {
-      unsaveItem(item.id);
+    if (isSaved(id)) {
+      unsaveItem(id);
     } else {
-      saveItem({ id: item.id, name: item.name, category: item.category, type: "venue", meta: item.distance });
+      saveItem({ id, name: item.title, category: item.tag ?? item.type, type: "venue", meta: item.meta ?? item.description });
     }
   };
 
-  const handleTrendingBookmark = (item: typeof TRENDING[0]) => {
+  const handleTrendingBookmark = (item: FeedItem) => {
+    const id = item.id ?? item.title;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (isSaved(item.id)) {
-      unsaveItem(item.id);
+    if (isSaved(id)) {
+      unsaveItem(id);
     } else {
-      saveItem({ id: item.id, name: item.name, category: item.category, type: "venue", meta: item.trendLabel });
+      saveItem({ id, name: item.title, category: item.tag ?? item.type, type: "venue", meta: item.description ?? item.meta });
     }
   };
 
@@ -143,80 +145,76 @@ export default function CultureTab() {
 
         {tab === "trending" && (
           <View style={styles.section}>
-            {TRENDING.map((item) => (
-              <View key={item.id} style={[styles.trendCard, { backgroundColor: C.surface, borderColor: C.border }]}>
-                <View style={[styles.trendIcon, { backgroundColor: item.iconBg }]}>
-                  <Text style={styles.trendIconEmoji}>{item.icon}</Text>
+            {trendingItems.map((item) => {
+              const id = item.id ?? item.title;
+              const { icon, bg } = TYPE_ICONS[item.type] ?? { icon: "📍", bg: "#7C7870" };
+              return (
+                <View key={id} style={[styles.trendCard, { backgroundColor: C.surface, borderColor: C.border }]}>
+                  <View style={[styles.trendIcon, { backgroundColor: bg }]}>
+                    <Text style={styles.trendIconEmoji}>{icon}</Text>
+                  </View>
+                  <View style={styles.trendInfo}>
+                    <Text style={[styles.trendName, { color: C.textPrimary }]}>{item.title}</Text>
+                    <Text style={[styles.trendCat, { color: C.textTertiary }]}>{item.tag ?? item.type.toUpperCase()}</Text>
+                    <Text style={[styles.trendLabel, { color: TREND_COLORS.steady }]}>{item.description}</Text>
+                  </View>
+                  <View style={styles.trendRight}>
+                    <Sparkline data={[3, 4, 5, 6, 7, 8, 9, 10, 9, 8]} color={TREND_COLORS.steady} />
+                    <Pressable
+                      onPress={() => handleTrendingBookmark(item)}
+                      style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1, marginTop: 6 }]}
+                    >
+                      <Ionicons name={isSaved(id) ? "bookmark" : "bookmark-outline"} size={16} color={isSaved(id) ? "#E8533A" : C.textTertiary} />
+                    </Pressable>
+                  </View>
                 </View>
-                <View style={styles.trendInfo}>
-                  <Text style={[styles.trendName, { color: C.textPrimary }]}>{item.name}</Text>
-                  <Text style={[styles.trendCat, { color: C.textTertiary }]}>{item.category}</Text>
-                  <Text style={[styles.trendLabel, { color: TREND_COLORS[item.trend] }]}>{item.trendLabel}</Text>
-                </View>
-                <View style={styles.trendRight}>
-                  <Sparkline data={item.sparkData} color={TREND_COLORS[item.trend]} />
-                  <Pressable
-                    onPress={() => handleTrendingBookmark(item)}
-                    style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1, marginTop: 6 }]}
-                  >
-                    <Ionicons name={isSaved(item.id) ? "bookmark" : "bookmark-outline"} size={16} color={isSaved(item.id) ? "#E8533A" : C.textTertiary} />
-                  </Pressable>
-                </View>
-              </View>
-            ))}
+              );
+            })}
             <Text style={[styles.refreshHint, { color: C.textTertiary }]}>Signals update every 90 seconds</Text>
           </View>
         )}
 
         {tab === "discover" && (
           <View style={styles.section}>
-            <View style={styles.discoverHeadingRow}>
-              <Text style={[styles.discoverHeading, { color: C.textPrimary }]}>Worth finding tonight</Text>
-              <Pressable
-                onPress={() => {
-                  setCycleIdx((prev) => (prev + 1) % TONIGHT_CYCLE.length);
-                  setDiscoverVersion((prev) => (prev + 1) % DISCOVER_SETS.length);
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                }}
-                style={({ pressed }) => [styles.cycleBtn, { backgroundColor: C.border, opacity: pressed ? 0.7 : 1 }]}
-              >
-                <Ionicons name="refresh" size={14} color={C.textSecondary} />
-              </Pressable>
-            </View>
+            <Text style={[styles.discoverHeading, { color: C.textPrimary, marginBottom: 10 }]}>Worth finding tonight</Text>
 
-            <View style={[styles.featuredPick, { backgroundColor: "#FEF0ED", borderColor: "#E8533A" }]}>
-              <Text style={styles.featuredPickEmoji}>✨</Text>
-              <Text style={styles.featuredPickText}>{TONIGHT_CYCLE[cycleIdx]}</Text>
-            </View>
-
-            {DISCOVER_SETS[discoverVersion].map((item) => (
-              <View key={item.id} style={[styles.discoverCard, { backgroundColor: C.surface, borderColor: C.border }]}>
-                <View style={styles.discoverCardTop}>
-                  <View style={[styles.catPill, item.featured && styles.catPillFeatured, !item.featured && { backgroundColor: C.border }]}>
-                    <Text style={[styles.catPillText, item.featured ? styles.catPillTextFeatured : { color: C.textSecondary }]}>{item.category}</Text>
+            {discoverItems.map((item) => {
+              const id = item.id ?? item.title;
+              return (
+                <View key={id} style={[styles.discoverCard, { backgroundColor: C.surface, borderColor: C.border }]}>
+                  <View style={styles.discoverCardTop}>
+                    <View style={[styles.catPill, { backgroundColor: C.border }]}>
+                      <Text style={[styles.catPillText, { color: C.textSecondary }]}>{item.tag ?? item.type.toUpperCase()}</Text>
+                    </View>
+                    <Pressable
+                      onPress={() => handleBookmark(item)}
+                      style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
+                    >
+                      <Ionicons name={isSaved(id) ? "bookmark" : "bookmark-outline"} size={18} color={isSaved(id) ? "#E8533A" : C.textTertiary} />
+                    </Pressable>
                   </View>
-                  <Pressable
-                    onPress={() => handleBookmark(item)}
-                    style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
-                  >
-                    <Ionicons name={isSaved(item.id) ? "bookmark" : "bookmark-outline"} size={18} color={isSaved(item.id) ? "#E8533A" : C.textTertiary} />
-                  </Pressable>
-                </View>
-                <Text style={[styles.discoverName, { color: C.textPrimary }]}>{item.name}</Text>
-                <Text style={[styles.discoverDesc, { color: C.textSecondary }]}>{item.description}</Text>
-                <View style={styles.discoverMeta}>
-                  <View style={[styles.metaChip, { backgroundColor: C.border }]}>
-                    <Text style={[styles.metaChipText, { color: C.textSecondary }]}>{item.distance}</Text>
-                  </View>
-                  <View style={[styles.metaChip, { backgroundColor: C.border }]}>
-                    <Text style={[styles.metaChipText, { color: C.textSecondary }]}>{item.price}</Text>
-                  </View>
-                  <View style={[styles.metaChip, { backgroundColor: "#EDF7F2" }]}>
-                    <Text style={[styles.metaChipText, { color: "#16A34A" }]}>{item.open}</Text>
+                  <Text style={[styles.discoverName, { color: C.textPrimary }]}>{item.title}</Text>
+                  <Text style={[styles.discoverDesc, { color: C.textSecondary }]}>{item.description}</Text>
+                  <View style={styles.discoverMeta}>
+                    {item.meta && (
+                      <View style={[styles.metaChip, { backgroundColor: C.border }]}>
+                        <Text style={[styles.metaChipText, { color: C.textSecondary }]}>{item.meta}</Text>
+                      </View>
+                    )}
+                    {item.tag && (
+                      <View style={[styles.metaChip, { backgroundColor: C.border }]}>
+                        <Text style={[styles.metaChipText, { color: C.textSecondary }]}>{item.tag}</Text>
+                      </View>
+                    )}
+                    {item.time && (
+                      <View style={[styles.metaChip, { backgroundColor: "#EDF7F2" }]}>
+                        <Text style={[styles.metaChipText, { color: "#16A34A" }]}>{item.time}</Text>
+                      </View>
+                    )}
                   </View>
                 </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
         )}
       </ScrollView>
