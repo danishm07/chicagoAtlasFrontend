@@ -11,6 +11,9 @@ import {
   Animated,
   KeyboardAvoidingView,
   Keyboard,
+  Linking,
+  Image,
+  ImageBackground,
 } from "react-native";
 import { useSafeAreaInsets, SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -20,7 +23,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import { useProfile } from "@/context/profile";
 import { useSaved } from "@/context/saved";
 import { useColors } from "@/context/theme";
-import { FLAGS, BACKEND_URL } from "@/constants/config";
+import { FLAGS, BACKEND_URL, AZURE_MAPS_KEY } from "@/constants/config";
 import SavedPanel from "@/components/SavedPanel";
 
 type Message = {
@@ -33,10 +36,28 @@ type Message = {
 };
 
 function getMockResponse(input: string): { text: string; sources: string[] } {
-  return {
-    text: "Four events happening tonight, thirty eight spots open nearby, all CTA lines are running normally, and air quality is good at AQI thirty seven. What do you want to know more about?",
-    sources: ["Chicago 311", "Yelp", "CTA Alerts", "Weather"],
-  };
+  const responses = [
+    {
+      text: "Four events happening tonight, thirty eight spots open nearby, all CTA lines are running normally, and air quality is good at AQI thirty seven. What do you want to know more about? ||MAP:Fairgrounds Coffee, Chicago||",
+      sources: ["Chicago 311", "Yelp", "CTA Alerts", "Weather"],
+    },
+    {
+      text: "I found several great coffee shops for you. The best one is Intelligentsia Coffee which has no wait right now. ||MAP:Intelligentsia Coffee, Millennium Park|| ||SOURCES:Yelp,Google Maps||",
+      sources: ["Yelp", "Google Maps"],
+    },
+    {
+      text: "There's a live music venue starting soon. Three Top Lounge has Fess Grandiose performing at 8:30PM. ||MAP:Three Top Lounge, Chicago|| ||SOURCES:Ticketmaster,Events||",
+      sources: ["Ticketmaster", "Events"],
+    }
+  ];
+  
+  // Return different responses based on input to test various scenarios
+  if (input.toLowerCase().includes('coffee')) {
+    return responses[1];
+  } else if (input.toLowerCase().includes('music')) {
+    return responses[2];
+  }
+  return responses[0];
 }
 
 const QUICK_PROMPTS = [
@@ -156,7 +177,7 @@ export default function AskTab() {
   // Audio State
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [isRecording, setIsRecording] = useState(false);
-  const [voiceMode, setVoiceMode] = useState(false);
+  const [voiceMode, setVoiceMode] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
   
   // Initialize audio mode on component mount
@@ -164,11 +185,12 @@ export default function AskTab() {
     const initializeAudio = async () => {
       try {
         await Audio.setAudioModeAsync({
-          allowsRecordingIOS: false,
+          allowsRecordingIOS: true,
           playsInSilentModeIOS: true,
           shouldDuckAndroid: true,
           playThroughEarpieceAndroid: false,
         });
+        await Audio.requestPermissionsAsync();
       } catch (err) {
         console.error('Failed to initialize audio mode:', err);
       }
@@ -629,6 +651,7 @@ export default function AskTab() {
 
     let displayText = item.text;
     let parsedSources = item.sources || [];
+    let mapQuery = "";
 
     if (displayText.includes('||SOURCES:')) {
       const parts = displayText.split('||SOURCES:');
@@ -640,11 +663,19 @@ export default function AskTab() {
       }
     }
 
+    if (displayText.includes('||MAP:')) {
+      const mapMatch = displayText.match(/\|\|MAP:(.*?)\|\|/);
+      if (mapMatch) {
+        mapQuery = mapMatch[1].trim();
+        displayText = displayText.replace(/\|\|MAP:.*?\|\|/, '').trim();
+      }
+    }
+
     return (
       <View style={styles.aiRow}>
         <HaroldAvatar />
         <View style={styles.aiMessageContainer}>
-          <Text style={[styles.aiBubbleText, item.isVoice && { fontStyle: 'italic' }]}>
+          <Text style={[styles.aiBubbleText, { color: C.textPrimary }, item.isVoice && { fontStyle: 'italic' }]}>
             {displayText}
           </Text>
           {parsedSources && parsedSources.length > 0 && (
@@ -658,6 +689,54 @@ export default function AskTab() {
                 </View>
               )}
             </View>
+          )}
+          {mapQuery && (
+            <Pressable 
+              style={[styles.mapCard, { 
+                marginTop: 10, 
+                backgroundColor: C.surface, 
+                borderRadius: 12, 
+                borderWidth: 1, 
+                borderColor: C.border, 
+                height: 120,
+                overflow: 'hidden',
+                padding: 0,
+                position: 'relative'
+              }]}
+              onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}`)}
+            >
+              <Image
+                source={{ uri: "https://atlas.microsoft.com/map/static/png?api-version=1.0&style=main&layer=basic&zoom=14&center=-87.6298,41.8781&height=150&width=300&subscription-key=" + AZURE_MAPS_KEY }}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  width: '100%',
+                  height: '100%',
+                }}
+                resizeMode="cover"
+              />
+              <View style={{
+                position: 'absolute',
+                bottom: 0,
+                width: '100%',
+                backgroundColor: 'rgba(26, 26, 26, 0.9)',
+                padding: 10,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 10
+              }}>
+                <Ionicons name="location" size={20} color="#4285F4" />
+                <Text style={{ 
+                  color: '#FFFFFF', 
+                  fontSize: 14, 
+                  fontWeight: "600",
+                  flex: 1
+                }}>{mapQuery}</Text>
+              </View>
+            </Pressable>
           )}
         </View>
       </View>
@@ -775,7 +854,10 @@ export default function AskTab() {
                 </ScrollView>
               </Animated.View>
 
-              <View style={styles.centeredInputWrap}>
+              <View style={[styles.centeredInputWrap, { borderColor: C.border, backgroundColor: C.surface }]}>
+                <Pressable onPress={() => setVoiceMode(!voiceMode)} style={styles.voiceToggle}>
+                  <Ionicons name={voiceMode ? "volume-high" : "volume-mute-outline"} size={22} color={voiceMode ? "#E8533A" : "#666"} />
+                </Pressable>
                 <TextInput
                   style={[styles.centeredInput, { color: C.textPrimary }]}
                   placeholder="Ask anything about Chicago..."
@@ -797,8 +879,20 @@ export default function AskTab() {
                     <Ionicons name="arrow-up" size={18} color="#FFFFFF" />
                   </Pressable>
                 ) : (
-                  <Pressable onPress={toggleRecording} style={[styles.centeredVoiceToggle, { backgroundColor: C.surface }]}>
-                    <Ionicons name="mic-outline" size={18} color={C.textSecondary} />
+                  <Pressable onPress={toggleRecording} style={styles.micIcon}>
+                    <Animated.View
+                      style={[
+                        styles.micPulse,
+                        {
+                          transform: [{ scale: micPulseAnim }],
+                          opacity: isRecording ? micPulseAnim.interpolate({
+                            inputRange: [1, 1.6],
+                            outputRange: [0.6, 0]
+                          }) : 0,
+                        },
+                      ]}
+                    />
+                    <Ionicons name={isRecording ? "square" : "mic-outline"} size={isRecording ? 16 : 22} color={isRecording ? "#E8533A" : "#555"} />
                   </Pressable>
                 )}
               </View>
@@ -809,7 +903,7 @@ export default function AskTab() {
         {/* Dynamic Input Bar Container */}
         {hasStarted && (
           <View style={[styles.inputBarContainer, { paddingBottom: bottomPad }]}>
-            <View style={styles.inputPill}>
+            <View style={[styles.inputPill, { borderColor: C.border, backgroundColor: C.surface }]}>
               <Pressable
                 onPress={() => {
                   if (voiceMode && isPlaying) {
@@ -839,11 +933,11 @@ export default function AskTab() {
                 />
               </Pressable>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: C.textPrimary }]}
                 value={inputText}
                 onChangeText={setInputText}
                 placeholder="Ask Harold..."
-                placeholderTextColor="#666"
+                placeholderTextColor={C.textTertiary}
                 multiline
                 maxLength={500}
                 returnKeyType="send"
@@ -929,7 +1023,6 @@ const styles = StyleSheet.create({
   },
   headerText: {
     fontSize: 13,
-    color: "#888",
     fontFamily: Platform.select({ ios: "SF Pro Text", default: "System" }),
   },
   themeToggle: {
@@ -993,12 +1086,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     color: "#FFFFFF",
   },
-  greetingSub: {
-    fontSize: 17,
-    textAlign: "center",
-    lineHeight: 24,
-    color: "#888888",
-  },
   chipScroll: {
     gap: 8,
     paddingHorizontal: 24,
@@ -1020,7 +1107,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#222",
     paddingHorizontal: 16,
     paddingVertical: 4,
     marginTop: 4,
@@ -1028,7 +1114,6 @@ const styles = StyleSheet.create({
   centeredInput: {
     flex: 1,
     fontSize: 15,
-    color: "#F0F0F0",
     paddingVertical: 12,
   },
   centeredSendBtn: {
@@ -1093,7 +1178,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   aiBubbleText: {
-    color: "#333333",
     fontSize: 15,
     lineHeight: 24,
     letterSpacing: 0.2,
@@ -1160,7 +1244,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: "#222",
     paddingHorizontal: 14,
     paddingVertical: 8,
     gap: 10,
@@ -1168,7 +1251,6 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 15,
-    color: "#F5F5F5",
     paddingVertical: 4, 
     maxHeight: 120,
     minHeight: 34,
@@ -1207,5 +1289,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
+  },
+  mapCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#1A1A1A",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#2A2A2A",
+    padding: 12,
+    marginTop: 8,
+    gap: 12,
+  },
+  mapCardText: {
+    fontSize: 14,
+    color: "#F5F5F5",
+    flex: 1,
   },
 });

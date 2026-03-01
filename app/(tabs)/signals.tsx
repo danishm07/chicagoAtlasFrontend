@@ -41,16 +41,18 @@ type ScoreResponse = {
 
 type WidgetId = "safety" | "transit" | "air" | "weather" | "crowds" | "events" | "reports";
 
-function getWidgets(liveData: ScoreResponse | null) {
+function getWidgets(liveData: ScoreResponse | null, cpdIncidents: any[]) {
   if (!liveData) return [];
   const d = liveData;
+  const incidentCount = cpdIncidents.length;
+  const safetyScore = Math.max(10, 100 - (incidentCount * 3));
   return [
     {
       id: "safety" as const,
       name: "Safety",
       icon: "shield-outline",
-      getValue: () => `${d.safety?.incidents ?? 0} incidents`,
-      sub: "Last 6 hours · 800m radius",
+      getValue: () => `${safetyScore}/100 Score`,
+      sub: "Official CPD Data · 800m radius",
     },
     {
       id: "transit" as const,
@@ -116,6 +118,12 @@ const LIVE_ARRIVALS = [
   { route: "Green Line", dest: "Harlem/Lake", eta: "4 min", color: "#009B3A" },
   { route: "Orange Line", dest: "Midway", eta: "7 min", color: "#F9461C" },
   { route: "Red Line", dest: "Howard", eta: "DUE", color: "#C60C30", station: "State/Lake" } 
+];
+
+const CPD_INCIDENTS = [
+  { type: "Theft - Retail", location: "State & Lake", time: "15 mins ago", level: "yellow" }, 
+  { type: "Disturbance", location: "Wabash & Washington", time: "42 mins ago", level: "yellow" }, 
+  { type: "Motor Vehicle Theft", location: "Monroe & Dearborn", time: "1 hr ago", level: "red" }
 ];
 
 // ─── Inline Slot Machine picker ──────────────────────────────────────────────
@@ -282,24 +290,46 @@ export default function SignalsTab() {
   const { panelOpen, closePanel } = useSaved();
 
   const [liveData, setLiveData] = useState<ScoreResponse | null>(null);
+  const [cpdIncidents, setCpdIncidents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const refreshRotation = useRef(new Animated.Value(0)).current;
   const [mapError, setMapError] = useState(false);
   const [mapLoading, setMapLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchScore = async () => {
-      try {
-        const res = await fetch(SCORE_URL);
-        if (res.ok) {
-          const data = (await res.json()) as ScoreResponse;
-          setLiveData(data);
-        }
-      } catch {
-        // keep previous data on error
-      } finally {
-        setLoading(false);
+  const fetchScore = async () => {
+    setRefreshing(true);
+    
+    // Animate refresh icon
+    Animated.loop(
+      Animated.timing(refreshRotation, {
+        toValue: 1,
+        duration: 1000,
+        useNativeDriver: true,
+      })
+    ).start();
+    
+    try {
+      const res = await fetch(SCORE_URL);
+      if (res.ok) {
+        const data = (await res.json()) as ScoreResponse;
+        setLiveData(data);
       }
-    };
+      
+      // Fetch live CPD data from Chicago Data Portal
+      const cpdRes = await fetch("https://data.cityofchicago.org/resource/ijzp-q8t2.json?$limit=4&$order=date%20DESC");
+      const cpdData = await cpdRes.json();
+      setCpdIncidents(cpdData);
+    } catch {
+      // keep previous data on error
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+      refreshRotation.stopAnimation();
+    }
+  };
+
+  useEffect(() => {
     fetchScore();
     const interval = setInterval(fetchScore, 90 * 1000);
     return () => clearInterval(interval);
@@ -308,7 +338,7 @@ export default function SignalsTab() {
   const [selectedWidgets, setSelectedWidgets] = useState<WidgetId[]>(["safety", "transit"]);
   const [swapSlot, setSwapSlot] = useState<number | null>(null);
 
-  const WIDGETS = getWidgets(liveData);
+  const WIDGETS = getWidgets(liveData, cpdIncidents);
   const reports = normalizeReports(liveData?.reports);
 
   const [activeDrawer, setActiveDrawer] = useState<"alerts" | "transit" | null>(null);
@@ -408,8 +438,41 @@ export default function SignalsTab() {
         contentContainerStyle={[styles.content, { paddingBottom: bottomPad }]}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={[styles.sectionLabel, { color: C.textTertiary }]}>LIVE WIDGETS</Text>
-        <Text style={[styles.sectionHint, { color: C.textSecondary }]}>Hold any widget to swap it</Text>
+        <View style={styles.headerRow}>
+          <View>
+            <Text style={[styles.sectionLabel, { color: C.textTertiary }]}>LIVE WIDGETS</Text>
+            <Text style={[styles.sectionHint, { color: C.textSecondary }]}>Hold any widget to swap it</Text>
+          </View>
+          <Pressable
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              fetchScore();
+            }}
+            style={({ pressed }) => [
+              styles.refreshButton,
+              { backgroundColor: C.surface, borderColor: C.border, opacity: pressed ? 0.7 : 1 }
+            ]}
+          >
+            <Animated.View
+              style={{
+                transform: [
+                  {
+                    rotate: refreshRotation.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['0deg', '360deg'],
+                    }),
+                  },
+                ],
+              }}
+            >
+              <Ionicons 
+                name={refreshing ? "refresh" : "refresh-outline"} 
+                size={16} 
+                color={C.textSecondary} 
+              />
+            </Animated.View>
+          </Pressable>
+        </View>
 
         <View style={styles.widgetGrid}>
           {[0, 1].map((slot) => {
@@ -447,7 +510,13 @@ export default function SignalsTab() {
             return (
               <Pressable
                 key={slot}
-                onPress={widget.id === "transit" ? () => openDrawer("transit") : undefined}
+                onPress={() => {
+                  if (widget.id === "transit") {
+                    openDrawer("transit");
+                  } else if (widget.id === "safety") {
+                    openDrawer("alerts");
+                  }
+                }}
                 onLongPress={() => handleLongPress(slot)}
                 delayLongPress={500}
                 style={({ pressed }) => [
@@ -548,6 +617,23 @@ export default function SignalsTab() {
 
             {activeDrawer === "alerts" && (
               <>
+                {/* Section 1: Official CPD Data */}
+                <Text style={[styles.sectionLabel, { color: C.textTertiary, marginBottom: 8 }]}>OFFICIAL CHICAGO POLICE DEPT. DATA</Text>
+                {cpdIncidents.map((incident, idx) => (
+                  <View key={idx} style={[styles.alertRow, { borderBottomColor: C.border }]}>
+                    <View style={[styles.alertDot, { backgroundColor: ALERT_COLORS[incident.level] ?? C.textTertiary }]} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.alertTitle, { color: C.textPrimary }]}>{incident.primary_type}</Text>
+                      <Text style={[styles.alertSub, { color: C.textSecondary }]}>{incident.block} · {new Date(incident.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</Text>
+                    </View>
+                    <Ionicons name="shield-checkmark" size={16} color="#4285F4" />
+                  </View>
+                ))}
+
+                <View style={[styles.drawerDivider, { backgroundColor: C.border }]} />
+
+                {/* Section 2: Community Reports */}
+                <Text style={[styles.sectionLabel, { color: C.textTertiary, marginBottom: 8, marginTop: 8 }]}>COMMUNITY REPORTS</Text>
                 {reports.map((r) => (
                   <View key={r.id} style={[styles.alertRow, { borderBottomColor: C.border }]}>
                     <View style={[styles.alertDot, { backgroundColor: ALERT_COLORS[r.level] ?? C.textTertiary }]} />
@@ -696,6 +782,11 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: GRID_PADDING, paddingTop: 8 },
   sectionLabel: { fontSize: 11, fontWeight: "700", letterSpacing: 1, marginBottom: 2 },
   sectionHint: { fontSize: 12, marginBottom: 12 },
+  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 },
+  refreshButton: {
+    width: 32, height: 32, borderRadius: 16,
+    borderWidth: 1.5, alignItems: "center", justifyContent: "center",
+  },
 
   widgetGrid: { flexDirection: "row", gap: GRID_GAP, marginBottom: 16 },
 
