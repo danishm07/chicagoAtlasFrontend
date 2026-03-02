@@ -22,4 +22,4 @@ Loop Pulse is a real-time, context-aware city intelligence platform for Chicago.
 ## ⚙️ Local Setup
 1. Clone the repository and run `npm install`
 2. Configure `.env.local` with the required API keys (e.g., Azure Maps static tile key if applicable).
-3. Run `npx expo start` and scan the QR code using the Expo Go app.
+3. Run `npx expo start` or `npm expo start --tunnel` and scan the QR code using the Expo Go app.
